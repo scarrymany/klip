@@ -38,6 +38,7 @@ public partial class MainWindow : Window
     private string _editorKind = ClipKinds.Clip;
     private string _editorColor = ClipColors.None;
     private string? _wallpaperLoaded;
+    private bool _appearanceReady;
 
     public ObservableCollection<ClipItem> VisibleClips => _visible;
 
@@ -832,7 +833,7 @@ public partial class MainWindow : Window
     private void PersistTheme()
     {
         _theme.Save(_store);
-        if (IsSourceInitialized)
+        if (_appearanceReady)
             ApplyTheme();
     }
 
@@ -912,7 +913,11 @@ public partial class MainWindow : Window
             brush.Color = color;
     }
 
-    private void OnSourceInitialized(object? sender, EventArgs e) => ApplyTheme();
+    private void OnSourceInitialized(object? sender, EventArgs e)
+    {
+        ApplyTheme();
+        _appearanceReady = true;
+    }
 
     private void OnClosing(object? sender, CancelEventArgs e)
     {
