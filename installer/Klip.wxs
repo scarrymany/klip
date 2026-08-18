@@ -1,0 +1,47 @@
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package
+    Name="Клип"
+    Manufacturer="scarrymany"
+    Version="1.0.0"
+    UpgradeCode="7c3e9a12-8b44-4f21-9d80-2a6f1c4e5b70"
+    Language="1049"
+    Scope="perMachine">
+    <SummaryInformation Description="Личный буфер обмена и заметки для Windows 10/11" />
+    <MajorUpgrade DowngradeErrorMessage="Более новая версия Клипа уже установлена." />
+    <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
+    <Icon Id="AppIcon" SourceFile="src\Klip\Assets\klip.ico" />
+    <Property Id="ARPPRODUCTICON" Value="AppIcon" />
+    <Property Id="ARPHELPLINK" Value="https://github.com/scarrymany/klip" />
+    <Property Id="ARPURLINFOABOUT" Value="https://github.com/scarrymany/klip" />
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="Klip" />
+    </StandardDirectory>
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="AppStartMenu" Name="Клип" />
+    </StandardDirectory>
+    <StandardDirectory Id="DesktopFolder" />
+
+    <Feature Id="Main" Title="Клип" Level="1">
+      <Component Directory="INSTALLFOLDER" Guid="b91e2c44-0d77-4a1a-9f10-66c1d2aa9011">
+        <File Id="KlipExe" Source="$(PublishDir)\Klip.exe" KeyPath="yes" />
+        <Shortcut
+          Id="StartMenuShortcut"
+          Name="Клип"
+          Directory="AppStartMenu"
+          WorkingDirectory="INSTALLFOLDER"
+          Icon="AppIcon"
+          Advertise="no" />
+        <Shortcut
+          Id="DesktopShortcut"
+          Name="Клип"
+          Directory="DesktopFolder"
+          WorkingDirectory="INSTALLFOLDER"
+          Icon="AppIcon"
+          Advertise="no" />
+        <RemoveFolder Id="RemoveStartMenu" Directory="AppStartMenu" On="uninstall" />
+        <RegistryValue Root="HKCU" Key="Software\scarrymany\Klip" Name="installed" Type="integer" Value="1" />
+      </Component>
+    </Feature>
+  </Package>
+</Wix>

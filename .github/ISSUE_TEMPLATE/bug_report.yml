@@ -1,0 +1,32 @@
+name: Ошибка
+description: Что-то сломалось в Клипе
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: Что произошло
+      description: Ожидание и факт
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Версия
+      placeholder: 1.0.0
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Система
+      options:
+        - Windows 11
+        - Windows 10
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Как повторить
+      placeholder: 1. Скопировал текст...

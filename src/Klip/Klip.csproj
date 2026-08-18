@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net9.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ApplicationIcon>Assets\klip.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <RootNamespace>Klip</RootNamespace>
+    <AssemblyName>Klip</AssemblyName>
+    <Version>1.0.0</Version>
+    <AssemblyTitle>Клип</AssemblyTitle>
+    <Product>Клип</Product>
+    <Company>scarrymany</Company>
+    <Authors>scarrymany</Authors>
+    <Copyright>© 2026 scarrymany</Copyright>
+    <Description>Личный буфер обмена и заметки для Windows 10/11</Description>
+    <NeutralLanguage>ru-RU</NeutralLanguage>
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <DebugType>embedded</DebugType>
+    <SatelliteResourceLanguages>ru;en</SatelliteResourceLanguages>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="9.0.8" />
+  </ItemGroup>
+  <ItemGroup>
+    <Resource Include="Assets\klip.ico" />
+    <Resource Include="Assets\logo.png" />
+  </ItemGroup>
+</Project>
