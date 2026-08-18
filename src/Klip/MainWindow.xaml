@@ -35,6 +35,19 @@
                 CornerRadius="8"
                 ClipToBounds="True">
             <Grid>
+                <Image x:Name="WallpaperImage"
+                       Stretch="UniformToFill"
+                       Visibility="Collapsed"
+                       IsHitTestVisible="False">
+                    <Image.Effect>
+                        <BlurEffect x:Name="WallpaperBlur" Radius="0" KernelType="Gaussian" RenderingBias="Quality"/>
+                    </Image.Effect>
+                </Image>
+                <Border x:Name="WallpaperDim"
+                        Visibility="Collapsed"
+                        IsHitTestVisible="False"/>
+
+                <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="48"/>
                     <RowDefinition Height="*"/>
@@ -216,20 +229,20 @@
                                 </StackPanel>
                             </ScrollViewer>
 
-                            <StackPanel Grid.Row="1" Margin="8,10,8,6">
+                            <StackPanel Grid.Row="1" Margin="4,10,4,4">
                                 <CheckBox x:Name="StartupCheck"
                                           Style="{StaticResource GlassCheck}"
+                                          Margin="8,0,8,8"
                                           Content="Запускать с Windows"
                                           Checked="OnStartupChanged"
                                           Unchecked="OnStartupChanged"/>
-                                <Button Style="{StaticResource GhostButton}"
-                                        HorizontalAlignment="Left"
-                                        Padding="0,8,0,0"
-                                        Margin="0,4,0,0"
-                                        Click="OnCheckUpdates"
-                                        Content="Проверить обновления"/>
+                                <Button x:Name="SettingsButton"
+                                        Style="{StaticResource NavButton}"
+                                        Click="OnOpenSettings">
+                                    <TextBlock Text="Настройки" HorizontalAlignment="Left"/>
+                                </Button>
                                 <TextBlock x:Name="VersionLabel"
-                                           Margin="0,8,0,0"
+                                           Margin="12,8,8,4"
                                            FontSize="11"
                                            Foreground="{StaticResource SubtleBrush}"/>
                             </StackPanel>
@@ -516,6 +529,117 @@
                         <Button Style="{StaticResource PrimaryButton}" Content="Сохранить" Margin="8,0,0,0" Padding="18,8" Click="OnEditorSave"/>
                     </StackPanel>
                 </StackPanel>
+            </Border>
+        </Grid>
+
+        <Grid x:Name="SettingsOverlay" Visibility="Collapsed" Background="#990B0D11">
+            <Border Width="440" MaxHeight="620"
+                    VerticalAlignment="Center" HorizontalAlignment="Center"
+                    Background="#F016191F"
+                    BorderBrush="{StaticResource HairlineStrongBrush}"
+                    BorderThickness="1"
+                    CornerRadius="20"
+                    Padding="22,18">
+                <DockPanel>
+                    <Grid DockPanel.Dock="Top" Margin="0,0,0,12">
+                        <TextBlock Text="Настройки" FontSize="18" FontWeight="SemiBold"/>
+                        <Button Style="{StaticResource IconButton}"
+                                HorizontalAlignment="Right"
+                                Width="32" Height="32"
+                                Click="OnCloseSettings"
+                                ToolTip="Закрыть">
+                            <Path Width="9" Height="9" Stretch="Uniform"
+                                  Stroke="{StaticResource MutedBrush}" StrokeThickness="1.6"
+                                  Data="M1,1 L11,11 M11,1 L1,11"/>
+                        </Button>
+                    </Grid>
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                        <StackPanel>
+                            <TextBlock Text="Окно" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource SubtleBrush}"/>
+                            <CheckBox x:Name="SettingsAcrylic"
+                                      Style="{StaticResource GlassCheck}"
+                                      Margin="0,10,0,4"
+                                      Content="Прозрачность Windows"
+                                      Checked="OnThemeChanged"
+                                      Unchecked="OnThemeChanged"/>
+                            <TextBlock Text="Mica и Acrylic на Windows 11. На Windows 10 остаётся плотный цвет."
+                                       FontSize="11" Foreground="{StaticResource SubtleBrush}"
+                                       TextWrapping="Wrap" Margin="0,0,0,16"/>
+
+                            <TextBlock Text="Цвет акцента" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource SubtleBrush}" Margin="0,0,0,8"/>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+                                <Button Width="22" Height="22" Margin="0,0,8,0" Click="OnAccentDot" Tag="#D7DDE6" ToolTip="Светлый" Background="#D7DDE6" Style="{StaticResource ColorSwatch}"/>
+                                <Button Width="22" Height="22" Margin="0,0,8,0" Click="OnAccentDot" Tag="#7AA2C4" ToolTip="Небо" Background="#7AA2C4" Style="{StaticResource ColorSwatch}"/>
+                                <Button Width="22" Height="22" Margin="0,0,8,0" Click="OnAccentDot" Tag="#7A9A86" ToolTip="Шалфей" Background="#7A9A86" Style="{StaticResource ColorSwatch}"/>
+                                <Button Width="22" Height="22" Margin="0,0,8,0" Click="OnAccentDot" Tag="#C48A7A" ToolTip="Глина" Background="#C48A7A" Style="{StaticResource ColorSwatch}"/>
+                                <Button Width="22" Height="22" Margin="0,0,8,0" Click="OnAccentDot" Tag="#C4B49A" ToolTip="Песок" Background="#C4B49A" Style="{StaticResource ColorSwatch}"/>
+                                <Button Width="22" Height="22" Click="OnAccentDot" Tag="#A89BC4" ToolTip="Лаванда" Background="#A89BC4" Style="{StaticResource ColorSwatch}"/>
+                            </StackPanel>
+
+                            <TextBlock Text="Цвет подложки" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource SubtleBrush}" Margin="0,0,0,8"/>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+                                <Button Width="22" Height="22" Margin="0,0,8,0" Click="OnTintDot" Tag="#0B0D11" ToolTip="Ночь" Background="#0B0D11" Style="{StaticResource ColorSwatch}"/>
+                                <Button Width="22" Height="22" Margin="0,0,8,0" Click="OnTintDot" Tag="#12151C" ToolTip="Графит" Background="#12151C" Style="{StaticResource ColorSwatch}"/>
+                                <Button Width="22" Height="22" Margin="0,0,8,0" Click="OnTintDot" Tag="#0E1218" ToolTip="Чернила" Background="#0E1218" Style="{StaticResource ColorSwatch}"/>
+                                <Button Width="22" Height="22" Click="OnTintDot" Tag="#16120E" ToolTip="Тёплый" Background="#16120E" Style="{StaticResource ColorSwatch}"/>
+                            </StackPanel>
+
+                            <TextBlock Text="Фон" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource SubtleBrush}"/>
+                            <TextBlock Text="Своё фото растянется под окно. Размытие и затемнение подгоняют его под тёмный интерфейс."
+                                       FontSize="11" Foreground="{StaticResource SubtleBrush}"
+                                       TextWrapping="Wrap" Margin="0,6,0,10"/>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                <Button Style="{StaticResource PrimaryButton}" Content="Выбрать фото" Click="OnPickWallpaper" Padding="12,7"/>
+                                <Button Style="{StaticResource GhostButton}" Content="Убрать" Margin="8,0,0,0" Click="OnClearWallpaper" Padding="12,7"/>
+                                <Button Style="{StaticResource GhostButton}" Content="Цвет из фото" Margin="8,0,0,0" Click="OnSampleWallpaper" Padding="12,7"/>
+                            </StackPanel>
+                            <TextBlock x:Name="SettingsPhotoName"
+                                       Text="Фото не выбрано"
+                                       FontSize="12"
+                                       Foreground="{StaticResource MutedBrush}"
+                                       Margin="0,0,0,12"/>
+
+                            <TextBlock Text="Растяжение" FontSize="11" Foreground="{StaticResource SubtleBrush}" Margin="0,0,0,8"/>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,14">
+                                <ToggleButton x:Name="StretchCover" Style="{StaticResource ChipToggle}" Content="Заполнить" Margin="0,0,6,0" Click="OnStretchChip"/>
+                                <ToggleButton x:Name="StretchFill" Style="{StaticResource ChipToggle}" Content="Растянуть" Margin="0,0,6,0" Click="OnStretchChip"/>
+                                <ToggleButton x:Name="StretchFit" Style="{StaticResource ChipToggle}" Content="Вписать" Click="OnStretchChip"/>
+                            </StackPanel>
+
+                            <Grid Margin="0,0,0,10">
+                                <TextBlock Text="Размытие" FontSize="12" Foreground="{StaticResource MutedBrush}"/>
+                                <TextBlock x:Name="SettingsBlurValue" Text="18" HorizontalAlignment="Right" FontSize="12" Foreground="{StaticResource SubtleBrush}"/>
+                            </Grid>
+                            <Slider x:Name="SettingsBlur"
+                                    Style="{StaticResource GlassSlider}"
+                                    Minimum="0" Maximum="40"
+                                    Value="18"
+                                    ValueChanged="OnThemeSlider"/>
+
+                            <Grid Margin="0,14,0,10">
+                                <TextBlock Text="Затемнение" FontSize="12" Foreground="{StaticResource MutedBrush}"/>
+                                <TextBlock x:Name="SettingsDimValue" Text="58%" HorizontalAlignment="Right" FontSize="12" Foreground="{StaticResource SubtleBrush}"/>
+                            </Grid>
+                            <Slider x:Name="SettingsDim"
+                                    Style="{StaticResource GlassSlider}"
+                                    Minimum="15" Maximum="88"
+                                    Value="58"
+                                    ValueChanged="OnThemeSlider"/>
+
+                            <TextBlock Text="Обновления" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource SubtleBrush}" Margin="0,20,0,8"/>
+                            <Button Style="{StaticResource NavButton}" Height="40" Click="OnCheckUpdates">
+                                <TextBlock Text="Проверить обновления" HorizontalAlignment="Left"/>
+                            </Button>
+
+                            <Button Style="{StaticResource GhostButton}"
+                                    HorizontalAlignment="Left"
+                                    Margin="0,16,0,4"
+                                    Padding="0,6"
+                                    Click="OnResetTheme"
+                                    Content="Сбросить оформление"/>
+                        </StackPanel>
+                    </ScrollViewer>
+                </DockPanel>
             </Border>
         </Grid>
 

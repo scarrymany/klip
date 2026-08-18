@@ -21,6 +21,7 @@ public partial class MainWindow : Window
     private readonly ClipStore _store;
     private readonly ClipboardWatcher _watcher;
     private readonly UpdateService _updates;
+    private readonly UiTheme _theme;
     private readonly List<ClipItem> _all = [];
     private readonly ObservableCollection<ClipItem> _visible = [];
     private readonly DispatcherTimer _toastTimer;
@@ -36,6 +37,7 @@ public partial class MainWindow : Window
     private CancellationTokenSource? _updateCts;
     private string _editorKind = ClipKinds.Clip;
     private string _editorColor = ClipColors.None;
+    private string? _wallpaperLoaded;
 
     public ObservableCollection<ClipItem> VisibleClips => _visible;
 
@@ -44,10 +46,12 @@ public partial class MainWindow : Window
         _store = store;
         _watcher = watcher;
         _updates = new UpdateService(store);
+        _theme = UiTheme.Load(store);
         InitializeComponent();
         DataContext = this;
 
-        VersionLabel.Text = $"Версия {UpdateService.CurrentVersion}  ·  Ctrl+Shift+V";
+        VersionLabel.Text = $"Версия {UpdateService.CurrentVersion}";
+        SyncSettingsControls();
 
         _nav["all"] = NavAll;
         _nav["pinned"] = NavPinned;
@@ -667,7 +671,12 @@ public partial class MainWindow : Window
     {
         if (e.Key == Key.Escape)
         {
-            if (EditorOverlay.Visibility == Visibility.Visible)
+            if (SettingsOverlay.Visibility == Visibility.Visible)
+            {
+                SettingsOverlay.Visibility = Visibility.Collapsed;
+                SettingsButton.Tag = null;
+            }
+            else if (EditorOverlay.Visibility == Visibility.Visible)
                 EditorOverlay.Visibility = Visibility.Collapsed;
             else
                 HideToTray();
@@ -690,13 +699,220 @@ public partial class MainWindow : Window
         }
     }
 
-    private void OnSourceInitialized(object? sender, EventArgs e)
+    private void OnOpenSettings(object sender, RoutedEventArgs e)
     {
-        if (!AcrylicHelper.Apply(this))
-            WindowFrame.Background = AcrylicHelper.SolidFallbackBrush;
-        else
-            WindowFrame.Background = new SolidColorBrush(Color.FromArgb(0x66, 0x0B, 0x0D, 0x11));
+        SyncSettingsControls();
+        SettingsOverlay.Visibility = Visibility.Visible;
+        SettingsButton.Tag = "active";
     }
+
+    private void OnCloseSettings(object sender, RoutedEventArgs e)
+    {
+        SettingsOverlay.Visibility = Visibility.Collapsed;
+        SettingsButton.Tag = null;
+    }
+
+    private void OnThemeChanged(object sender, RoutedEventArgs e)
+    {
+        if (_syncingUi || !IsLoaded)
+            return;
+        _theme.Acrylic = SettingsAcrylic.IsChecked == true;
+        PersistTheme();
+    }
+
+    private void OnThemeSlider(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (_syncingUi || !IsLoaded || SettingsBlur is null || SettingsDim is null)
+            return;
+        _theme.Blur = SettingsBlur.Value;
+        _theme.Dim = SettingsDim.Value / 100.0;
+        SettingsBlurValue.Text = ((int)_theme.Blur).ToString(CultureInfo.InvariantCulture);
+        SettingsDimValue.Text = ((int)(_theme.Dim * 100)).ToString(CultureInfo.InvariantCulture) + "%";
+        PersistTheme();
+    }
+
+    private void OnAccentDot(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { Tag: string hex })
+        {
+            _theme.Accent = hex;
+            PersistTheme();
+        }
+    }
+
+    private void OnTintDot(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { Tag: string hex })
+        {
+            _theme.Tint = hex;
+            PersistTheme();
+        }
+    }
+
+    private void OnStretchChip(object sender, RoutedEventArgs e)
+    {
+        _theme.Stretch = sender switch
+        {
+            _ when ReferenceEquals(sender, StretchFill) => "Fill",
+            _ when ReferenceEquals(sender, StretchFit) => "Uniform",
+            _ => "UniformToFill",
+        };
+        SyncStretchChips();
+        PersistTheme();
+    }
+
+    private void OnPickWallpaper(object sender, RoutedEventArgs e)
+    {
+        var dialog = new Microsoft.Win32.OpenFileDialog
+        {
+            Title = "Фон окна",
+            Filter = "Изображения|*.jpg;*.jpeg;*.png;*.bmp;*.webp;*.jfif|Все файлы|*.*",
+        };
+        if (dialog.ShowDialog(this) != true)
+            return;
+
+        try
+        {
+            var path = _theme.InstallWallpaper(dialog.FileName);
+            try
+            {
+                _theme.Tint = UiTheme.ToHex(UiTheme.SampleAverage(path));
+            }
+            catch
+            {
+                // Keep the previous tint if sampling fails.
+            }
+
+            PersistTheme();
+            SyncSettingsControls();
+            Notify("Фон установлен");
+        }
+        catch (Exception ex)
+        {
+            Notify(ex.Message);
+        }
+    }
+
+    private void OnClearWallpaper(object sender, RoutedEventArgs e)
+    {
+        _theme.ClearWallpaper();
+        PersistTheme();
+        SyncSettingsControls();
+    }
+
+    private void OnSampleWallpaper(object sender, RoutedEventArgs e)
+    {
+        if (_theme.WallpaperPath is not { } path || !System.IO.File.Exists(path))
+        {
+            Notify("Сначала выберите фото");
+            return;
+        }
+
+        try
+        {
+            _theme.Tint = UiTheme.ToHex(UiTheme.SampleAverage(path));
+            PersistTheme();
+            Notify("Цвет подложки взят из фото");
+        }
+        catch (Exception ex)
+        {
+            Notify(ex.Message);
+        }
+    }
+
+    private void OnResetTheme(object sender, RoutedEventArgs e)
+    {
+        _theme.ClearWallpaper();
+        _theme.Reset();
+        PersistTheme();
+        SyncSettingsControls();
+        Notify("Оформление сброшено");
+    }
+
+    private void PersistTheme()
+    {
+        _theme.Save(_store);
+        if (IsSourceInitialized)
+            ApplyTheme();
+    }
+
+    private void SyncSettingsControls()
+    {
+        _syncingUi = true;
+        SettingsAcrylic.IsChecked = _theme.Acrylic;
+        SettingsBlur.Value = _theme.Blur;
+        SettingsDim.Value = _theme.Dim * 100;
+        SettingsBlurValue.Text = ((int)_theme.Blur).ToString(CultureInfo.InvariantCulture);
+        SettingsDimValue.Text = ((int)(_theme.Dim * 100)).ToString(CultureInfo.InvariantCulture) + "%";
+        SettingsPhotoName.Text = _theme.WallpaperFile is { } name ? name : "Фото не выбрано";
+        SyncStretchChips();
+        _syncingUi = false;
+    }
+
+    private void SyncStretchChips()
+    {
+        StretchCover.IsChecked = _theme.Stretch == "UniformToFill";
+        StretchFill.IsChecked = _theme.Stretch == "Fill";
+        StretchFit.IsChecked = _theme.Stretch == "Uniform";
+    }
+
+    private void ApplyTheme()
+    {
+        var accent = UiTheme.TryParseHex(_theme.Accent) ?? UiTheme.TryParseHex(UiTheme.DefaultAccent)!.Value;
+        var tint = UiTheme.TryParseHex(_theme.Tint) ?? UiTheme.TryParseHex(UiTheme.DefaultTint)!.Value;
+        SetBrush("AccentBrush", accent);
+        SetBrush("AccentFgBrush", UiTheme.ContrastOn(accent));
+        SetBrush("BgBrush", tint);
+
+        var hasPhoto = ApplyWallpaper(tint);
+        var useAcrylic = _theme.Acrylic && !hasPhoto;
+
+        if (useAcrylic && AcrylicHelper.Apply(this))
+        {
+            WindowFrame.Background = new SolidColorBrush(Color.FromArgb(0x66, tint.R, tint.G, tint.B));
+        }
+        else
+        {
+            AcrylicHelper.RemoveBackdrop(this, hasPhoto ? Colors.Transparent : tint);
+            WindowFrame.Background = hasPhoto
+                ? System.Windows.Media.Brushes.Transparent
+                : new SolidColorBrush(tint);
+        }
+    }
+
+    private bool ApplyWallpaper(Color tint)
+    {
+        if (_theme.WallpaperPath is not { } path || !System.IO.File.Exists(path))
+        {
+            WallpaperImage.Source = null;
+            _wallpaperLoaded = null;
+            WallpaperImage.Visibility = Visibility.Collapsed;
+            WallpaperDim.Visibility = Visibility.Collapsed;
+            return false;
+        }
+
+        if (_wallpaperLoaded != path)
+        {
+            WallpaperImage.Source = UiTheme.LoadBitmap(path);
+            _wallpaperLoaded = path;
+        }
+        WallpaperImage.Stretch = UiTheme.ParseStretch(_theme.Stretch);
+        WallpaperImage.Visibility = Visibility.Visible;
+        WallpaperBlur.Radius = _theme.Blur;
+        WallpaperDim.Background = new SolidColorBrush(Color.FromArgb(
+            (byte)Math.Clamp((int)(_theme.Dim * 255), 0, 255),
+            tint.R, tint.G, tint.B));
+        WallpaperDim.Visibility = Visibility.Visible;
+        return true;
+    }
+
+    private static void SetBrush(string key, Color color)
+    {
+        if (System.Windows.Application.Current.TryFindResource(key) is SolidColorBrush brush && !brush.IsFrozen)
+            brush.Color = color;
+    }
+
+    private void OnSourceInitialized(object? sender, EventArgs e) => ApplyTheme();
 
     private void OnClosing(object? sender, CancelEventArgs e)
     {

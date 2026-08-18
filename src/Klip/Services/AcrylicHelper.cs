@@ -51,6 +51,29 @@ public static class AcrylicHelper
         return true;
     }
 
+    public static void RemoveBackdrop(Window window, Color? solid = null)
+    {
+        var hwnd = new WindowInteropHelper(window).EnsureHandle();
+        var source = HwndSource.FromHwnd(hwnd);
+        var fill = solid ?? SolidFallback;
+
+        if (source?.CompositionTarget is { } target)
+            target.BackgroundColor = fill;
+
+        var none = NativeMethods.DWMSBT_NONE;
+        NativeMethods.DwmSetWindowAttribute(
+            hwnd, NativeMethods.DWMWA_SYSTEMBACKDROP_TYPE, ref none, sizeof(int));
+        var micaOff = 0;
+        NativeMethods.DwmSetWindowAttribute(
+            hwnd, NativeMethods.DWMWA_MICA_EFFECT, ref micaOff, sizeof(int));
+
+        var corner = NativeMethods.DWMWCP_ROUND;
+        NativeMethods.DwmSetWindowAttribute(
+            hwnd, NativeMethods.DWMWA_WINDOW_CORNER_PREFERENCE, ref corner, sizeof(int));
+
+        window.Background = new SolidColorBrush(fill);
+    }
+
     public static bool TryApply(Window window) => Apply(window);
 
     public static bool IsWindows11() => NativeMethods.IsWindows11();

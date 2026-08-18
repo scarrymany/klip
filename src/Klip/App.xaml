@@ -443,6 +443,62 @@
             <Setter Property="Padding" Value="7,2"/>
         </Style>
 
+        <Style x:Key="ColorSwatch" TargetType="Button">
+            <Setter Property="Width" Value="22"/>
+            <Setter Property="Height" Value="22"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="D" Width="18" Height="18" CornerRadius="9"
+                                Background="{TemplateBinding Background}"
+                                BorderThickness="1" BorderBrush="#55EEF1F5"/>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="D" Property="BorderBrush" Value="#EED7DDE6"/>
+                                <Setter TargetName="D" Property="BorderThickness" Value="2"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="GlassSlider" TargetType="Slider">
+            <Setter Property="Minimum" Value="0"/>
+            <Setter Property="Maximum" Value="40"/>
+            <Setter Property="Height" Value="22"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="IsMoveToPointEnabled" Value="True"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Slider">
+                        <Grid>
+                            <Border Height="4" CornerRadius="2" Background="{StaticResource GlassActiveBrush}" VerticalAlignment="Center" Margin="6,0"/>
+                            <Track x:Name="PART_Track">
+                                <Track.DecreaseRepeatButton>
+                                    <RepeatButton Command="Slider.DecreaseLarge" Opacity="0"/>
+                                </Track.DecreaseRepeatButton>
+                                <Track.IncreaseRepeatButton>
+                                    <RepeatButton Command="Slider.IncreaseLarge" Opacity="0"/>
+                                </Track.IncreaseRepeatButton>
+                                <Track.Thumb>
+                                    <Thumb Width="16" Height="16">
+                                        <Thumb.Template>
+                                            <ControlTemplate TargetType="Thumb">
+                                                <Ellipse Fill="{StaticResource AccentBrush}" Stroke="{StaticResource AccentFgBrush}" StrokeThickness="0"/>
+                                            </ControlTemplate>
+                                        </Thumb.Template>
+                                    </Thumb>
+                                </Track.Thumb>
+                            </Track>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <Style x:Key="ChipToggle" TargetType="ToggleButton">
             <Setter Property="Background" Value="{StaticResource GlassBrush}"/>
             <Setter Property="Foreground" Value="{StaticResource MutedBrush}"/>

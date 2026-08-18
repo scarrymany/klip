@@ -6,8 +6,8 @@ See the [Russian README](README.md) for full docs, badges and installers.
 
 | Asset | Role |
 | --- | --- |
-| `Klip-Setup-1.0.1.exe` | Inno Setup installer |
-| `Klip-1.0.1-win-x64.msi` | Per-machine MSI |
+| `Klip-Setup-1.0.2.exe` | Inno Setup installer |
+| `Klip-1.0.2-win-x64.msi` | Per-machine MSI |
 | `Klip-Portable-win-x64.zip` | No-install zip |
 
 Hotkey: `Ctrl + Shift + V`. Auto-update checks GitHub Releases and shows a card in the top-right.

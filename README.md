@@ -43,6 +43,7 @@ Windows забывает буфер после перезагрузки и по�
 | **Трей** | Закрытие прячет окно, а не убивает программу |
 | **Автозагрузка** | Опционально стартует вместе с Windows |
 | **Автообновление** | Карточка справа сверху, кнопка «Обновить», проверка SHA256 |
+| **Оформление** | Прозрачность, цвета, своё фото на фон с размытием |
 
 ## Установка
 
@@ -52,19 +53,19 @@ Windows забывает буфер после перезагрузки и по�
 <tr>
 <td width="33%" valign="top">
 
-**EXE** — `Klip-Setup-1.0.1.exe`
+**EXE** — `Klip-Setup-1.0.2.exe`
 
 Мастер Inno Setup на русском. Ярлыки, автозагрузка, удаление из «Программ».
 
 </td>
 <td width="33%" valign="top">
 
-**MSI** — `Klip-1.0.1-win-x64.msi`
+**MSI** — `Klip-1.0.2-win-x64.msi`
 
 Для тихой установки и корпоративных машин:
 
 ```powershell
-msiexec /i Klip-1.0.1-win-x64.msi /qn
+msiexec /i Klip-1.0.2-win-x64.msi /qn
 ```
 
 </td>
@@ -81,7 +82,7 @@ msiexec /i Klip-1.0.1-win-x64.msi /qn
 Проверка файла после загрузки:
 
 ```powershell
-Get-FileHash .\Klip-Setup-1.0.1.exe -Algorithm SHA256
+Get-FileHash .\Klip-Setup-1.0.2.exe -Algorithm SHA256
 ```
 
 Сверьте с `SHA256SUMS.txt` из того же релиза.
@@ -128,8 +129,8 @@ dotnet publish src/Klip/Klip.csproj -c Release -r win-x64 --self-contained true 
 Релизные EXE и MSI собирает [GitHub Actions](.github/workflows/release.yml) по тегу `v*`.
 
 ```powershell
-git tag v1.0.1
-git push origin v1.0.1
+git tag v1.0.2
+git push origin v1.0.2
 ```
 
 ## Вопросы
