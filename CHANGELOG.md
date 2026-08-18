@@ -3,6 +3,12 @@
 Формат основан на [Keep a Changelog](https://keepachangelog.com/ru/1.1.0/),
 нумерация версий следует [семантическому версионированию](https://semver.org/lang/ru/).
 
+## [1.0.5] - 2026-08-18
+
+### Добавлено
+
+- Закруглённые углы окна (16px) на Windows 10 и 11. В развёрнутом виде — без скругления.
+
 ## [1.0.4] - 2026-08-18
 
 ### Исправлено
@@ -62,6 +68,7 @@
   и сплошной фон `#0B0D11` на Windows 10.
 - Сборка одним файлом win-x64, установщик Inno Setup, MSI на WiX и портативный zip.
 
+[1.0.5]: https://github.com/scarrymany/klip/releases/tag/v1.0.5
 [1.0.4]: https://github.com/scarrymany/klip/releases/tag/v1.0.4
 [1.0.3]: https://github.com/scarrymany/klip/releases/tag/v1.0.3
 [1.0.2]: https://github.com/scarrymany/klip/releases/tag/v1.0.2

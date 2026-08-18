@@ -53,19 +53,19 @@ Windows забывает буфер после перезагрузки и по�
 <tr>
 <td width="33%" valign="top">
 
-**EXE** — `Klip-Setup-1.0.4.exe`
+**EXE** — `Klip-Setup-1.0.5.exe`
 
 Мастер Inno Setup на русском. Ярлыки, автозагрузка, удаление из «Программ».
 
 </td>
 <td width="33%" valign="top">
 
-**MSI** — `Klip-1.0.4-win-x64.msi`
+**MSI** — `Klip-1.0.5-win-x64.msi`
 
 Для тихой установки и корпоративных машин:
 
 ```powershell
-msiexec /i Klip-1.0.4-win-x64.msi /qn
+msiexec /i Klip-1.0.5-win-x64.msi /qn
 ```
 
 </td>
@@ -82,7 +82,7 @@ msiexec /i Klip-1.0.4-win-x64.msi /qn
 Проверка файла после загрузки:
 
 ```powershell
-Get-FileHash .\Klip-Setup-1.0.4.exe -Algorithm SHA256
+Get-FileHash .\Klip-Setup-1.0.5.exe -Algorithm SHA256
 ```
 
 Сверьте с `SHA256SUMS.txt` из того же релиза.
@@ -129,8 +129,8 @@ dotnet publish src/Klip/Klip.csproj -c Release -r win-x64 --self-contained true 
 Релизные EXE и MSI собирает [GitHub Actions](.github/workflows/release.yml) по тегу `v*`.
 
 ```powershell
-git tag v1.0.4
-git push origin v1.0.4
+git tag v1.0.5
+git push origin v1.0.5
 ```
 
 ## Вопросы

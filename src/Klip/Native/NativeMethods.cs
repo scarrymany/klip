@@ -76,6 +76,16 @@ internal static class NativeMethods
     [DllImport("user32.dll")]
     public static extern bool IsIconic(IntPtr hWnd);
 
+    [DllImport("gdi32.dll")]
+    public static extern IntPtr CreateRoundRectRgn(int x1, int y1, int x2, int y2, int w, int h);
+
+    [DllImport("gdi32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool DeleteObject(IntPtr hObject);
+
+    [DllImport("user32.dll")]
+    public static extern int SetWindowRgn(IntPtr hWnd, IntPtr hRgn, [MarshalAs(UnmanagedType.Bool)] bool bRedraw);
+
     [DllImport("dwmapi.dll")]
     public static extern int DwmSetWindowAttribute(IntPtr hwnd, int attribute, ref int value, int size);
 

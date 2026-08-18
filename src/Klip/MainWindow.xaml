@@ -16,13 +16,15 @@
         UseLayoutRounding="True"
         Closing="OnClosing"
         SourceInitialized="OnSourceInitialized"
+        SizeChanged="OnWindowSizeChanged"
+        DpiChanged="OnWindowDpiChanged"
         PreviewKeyDown="OnPreviewKeyDown"
         StateChanged="OnStateChanged">
     <WindowChrome.WindowChrome>
         <WindowChrome CaptionHeight="48"
                       ResizeBorderThickness="6"
                       GlassFrameThickness="-1"
-                      CornerRadius="0"
+                      CornerRadius="16"
                       UseAeroCaptionButtons="False"
                       NonClientFrameEdges="None"/>
     </WindowChrome.WindowChrome>
@@ -32,7 +34,7 @@
                 BorderBrush="{StaticResource HairlineStrongBrush}"
                 BorderThickness="1"
                 Background="Transparent"
-                CornerRadius="8"
+                CornerRadius="16"
                 ClipToBounds="True">
             <Grid>
                 <Image x:Name="WallpaperImage"

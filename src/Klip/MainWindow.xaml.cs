@@ -948,6 +948,8 @@ public partial class MainWindow : Window
                 ? System.Windows.Media.Brushes.Transparent
                 : new SolidColorBrush(tint);
         }
+
+        ApplyWindowShape();
     }
 
     private bool ApplyWallpaper(Color tint)
@@ -986,6 +988,19 @@ public partial class MainWindow : Window
     {
         ApplyTheme();
         _appearanceReady = true;
+        ApplyWindowShape();
+    }
+
+    private void OnWindowSizeChanged(object sender, SizeChangedEventArgs e) => ApplyWindowShape();
+
+    private void OnWindowDpiChanged(object sender, DpiChangedEventArgs e) => ApplyWindowShape();
+
+    private void ApplyWindowShape()
+    {
+        if (WindowFrame is null)
+            return;
+        WindowCorners.ClipFrame(WindowFrame, this);
+        WindowCorners.Apply(this);
     }
 
     private void OnClosing(object? sender, CancelEventArgs e)
@@ -1022,9 +1037,7 @@ public partial class MainWindow : Window
             WindowState == WindowState.Maximized
                 ? "M7,7 H15 V15 H7 Z M5,9 V17 H13"
                 : "M5,5 H15 V15 H5 Z");
-        WindowFrame.CornerRadius = WindowState == WindowState.Maximized
-            ? new CornerRadius(0)
-            : new CornerRadius(8);
+        ApplyWindowShape();
     }
 
     private static T? FindParent<T>(DependencyObject? start) where T : DependencyObject

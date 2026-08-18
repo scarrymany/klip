@@ -29,10 +29,6 @@ public static class AcrylicHelper
             return false;
         }
 
-        var corner = NativeMethods.DWMWCP_ROUND;
-        NativeMethods.DwmSetWindowAttribute(
-            hwnd, NativeMethods.DWMWA_WINDOW_CORNER_PREFERENCE, ref corner, sizeof(int));
-
         var margins = NativeMethods.Margins.Full;
         NativeMethods.DwmExtendFrameIntoClientArea(hwnd, ref margins);
 
@@ -48,6 +44,7 @@ public static class AcrylicHelper
         }
 
         window.Background = System.Windows.Media.Brushes.Transparent;
+        WindowCorners.Apply(window);
         return true;
     }
 
@@ -67,11 +64,8 @@ public static class AcrylicHelper
         NativeMethods.DwmSetWindowAttribute(
             hwnd, NativeMethods.DWMWA_MICA_EFFECT, ref micaOff, sizeof(int));
 
-        var corner = NativeMethods.DWMWCP_ROUND;
-        NativeMethods.DwmSetWindowAttribute(
-            hwnd, NativeMethods.DWMWA_WINDOW_CORNER_PREFERENCE, ref corner, sizeof(int));
-
         window.Background = new SolidColorBrush(fill);
+        WindowCorners.Apply(window);
     }
 
     public static bool TryApply(Window window) => Apply(window);
