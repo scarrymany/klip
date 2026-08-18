@@ -3,6 +3,16 @@
 Формат основан на [Keep a Changelog](https://keepachangelog.com/ru/1.1.0/),
 нумерация версий следует [семантическому версионированию](https://semver.org/lang/ru/).
 
+## [1.1.1] - 2026-08-19
+
+### Добавлено
+
+- Кнопка GitHub в заголовке окна открывает репозиторий в браузере по умолчанию.
+
+### Исправлено
+
+- Настройки оформления больше не обещают Mica/Acrylic: окно использует layered WPF на Windows 10 и 11.
+
 ## [1.1.0] - 2026-08-18
 
 ### Добавлено
@@ -119,10 +129,10 @@
 - Запуск вместе с Windows через HKCU Run.
 - Редактор новой заметки: заголовок, текст, тип, метка, папка.
 - Удаление записей и папок.
-- Окно без стандартного заголовка, тёмная тема, Mica/Acrylic на Windows 11
-  и сплошной фон `#0B0D11` на Windows 10.
+- Окно без стандартного заголовка, тёмная layered-подложка и прозрачные скруглённые углы.
 - Сборка одним файлом win-x64, установщик Inno Setup, MSI на WiX и портативный zip.
 
+[1.1.1]: https://github.com/scarrymany/klip/releases/tag/v1.1.1
 [1.1.0]: https://github.com/scarrymany/klip/releases/tag/v1.1.0
 [1.0.10]: https://github.com/scarrymany/klip/releases/tag/v1.0.10
 [1.0.9]: https://github.com/scarrymany/klip/releases/tag/v1.0.9

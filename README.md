@@ -4,7 +4,7 @@
 
 # Клип
 
-**Буфер, который ничего не забывает. Прозрачное окно Windows 11, заметки и история копирования.**
+**Буфер, который ничего не забывает. Прозрачное окно Windows 10/11, заметки и история копирования.**
 
 [![Release](https://img.shields.io/github/v/release/scarrymany/klip?style=for-the-badge&color=d7dde6&labelColor=0b0d11)](https://github.com/scarrymany/klip/releases/latest)
 [![CI](https://img.shields.io/github/actions/workflow/status/scarrymany/klip/ci.yml?branch=main&style=for-the-badge&label=CI&labelColor=0b0d11)](https://github.com/scarrymany/klip/actions/workflows/ci.yml)
@@ -53,19 +53,19 @@ Windows забывает буфер после перезагрузки и по�
 <tr>
 <td width="33%" valign="top">
 
-**EXE** - `Klip-Setup-1.1.0.exe`
+**EXE** - `Klip-Setup-1.1.1.exe`
 
-Мастер Inno Setup на русском. Ярлыки, автозагрузка, удаление из «Программ».
+Мастер Inno Setup на русском. Ярлыки и удаление из «Программ».
 
 </td>
 <td width="33%" valign="top">
 
-**MSI** - `Klip-1.1.0-win-x64.msi`
+**MSI** - `Klip-1.1.1-win-x64.msi`
 
 Для тихой установки и корпоративных машин:
 
 ```powershell
-msiexec /i Klip-1.1.0-win-x64.msi /qn
+msiexec /i Klip-1.1.1-win-x64.msi /qn
 ```
 
 </td>
@@ -82,7 +82,7 @@ msiexec /i Klip-1.1.0-win-x64.msi /qn
 Проверка файла после загрузки:
 
 ```powershell
-Get-FileHash .\Klip-Setup-1.1.0.exe -Algorithm SHA256
+Get-FileHash .\Klip-Setup-1.1.1.exe -Algorithm SHA256
 ```
 
 Сверьте с `SHA256SUMS.txt` из того же релиза.
@@ -129,8 +129,8 @@ dotnet publish src/Klip/Klip.csproj -c Release -r win-x64 --self-contained true 
 Релизные EXE и MSI собирает [GitHub Actions](.github/workflows/release.yml) по тегу `v*`.
 
 ```powershell
-git tag v1.1.0
-git push origin v1.1.0
+git tag v1.1.1
+git push origin v1.1.1
 ```
 
 ## Вопросы

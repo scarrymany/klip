@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
@@ -1148,6 +1149,22 @@ public partial class MainWindow : Window
         {
             e.Cancel = true;
             HideToTray();
+        }
+    }
+
+    private void OnOpenGitHub(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = "https://github.com/scarrymany/klip",
+                UseShellExecute = true,
+            });
+        }
+        catch (Exception ex)
+        {
+            Notify($"Не удалось открыть GitHub: {ex.Message}");
         }
     }
 

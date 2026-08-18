@@ -23,13 +23,7 @@ internal static class NativeMethods
     public const int DWMWA_SYSTEMBACKDROP_TYPE = 38;
     public const int DWMWA_MICA_EFFECT = 1029;
 
-    // Official DWM_SYSTEMBACKDROP_TYPE. The window uses 3 first (glass/acrylic),
-    // then 4, then 2 - see AcrylicHelper.
-    public const int DWMSBT_AUTO = 0;
     public const int DWMSBT_NONE = 1;
-    public const int DWMSBT_MAINWINDOW = 2;
-    public const int DWMSBT_TRANSIENTWINDOW = 3;
-    public const int DWMSBT_TABBEDWINDOW = 4;
 
     public const int DWMWCP_DEFAULT = 0;
     public const int DWMWCP_DONOTROUND = 1;
