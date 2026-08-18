@@ -7,6 +7,7 @@ public sealed class CollectionItem : INotifyPropertyChanged
 {
     private string _name = "";
     private int _count;
+    private bool _isSelected;
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
@@ -24,6 +25,12 @@ public sealed class CollectionItem : INotifyPropertyChanged
     {
         get => _count;
         set => Set(ref _count, value);
+    }
+
+    public bool IsSelected
+    {
+        get => _isSelected;
+        set => Set(ref _isSelected, value);
     }
 
     private bool Set<T>(ref T field, T value, [CallerMemberName] string? name = null)
