@@ -5,7 +5,7 @@
 #define MyAppExeName "Klip.exe"
 
 #ifndef MyAppVersion
-  #define MyAppVersion "1.0.0"
+  #define MyAppVersion "1.0.1"
 #endif
 
 #ifndef PublishDir
@@ -50,7 +50,8 @@ VersionInfoProductVersion={#MyAppVersion}
 ShowLanguageDialog=yes
 UsePreviousLanguage=yes
 CloseApplications=yes
-RestartApplications=no
+RestartApplications=yes
+AppMutex=Local\Klip.scarrymany.single
 
 [Languages]
 Name: "russian"; MessagesFile: "compiler:Languages\Russian.isl"
@@ -69,6 +70,7 @@ Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: de
 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\{#MyAppExeName}"; Flags: nowait postinstall skipifnotsilent
 
 [UninstallDelete]
 Type: filesandordirs; Name: "{userappdata}\Klip"

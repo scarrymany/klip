@@ -5,6 +5,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Shell;
 using System.Windows.Threading;
 using Klip.Models;
@@ -19,15 +20,20 @@ public partial class MainWindow : Window
 {
     private readonly ClipStore _store;
     private readonly ClipboardWatcher _watcher;
+    private readonly UpdateService _updates;
     private readonly List<ClipItem> _all = [];
     private readonly ObservableCollection<ClipItem> _visible = [];
     private readonly DispatcherTimer _toastTimer;
+    private readonly DispatcherTimer _updateTimer;
     private readonly Dictionary<string, WpfButton> _nav = [];
 
     private string _filter = "all";
     private bool _forceClose;
     private bool _syncingUi;
+    private bool _updating;
     private ClipItem? _editing;
+    private UpdateInfo? _pendingUpdate;
+    private CancellationTokenSource? _updateCts;
     private string _editorKind = ClipKinds.Clip;
     private string _editorColor = ClipColors.None;
 
@@ -37,8 +43,11 @@ public partial class MainWindow : Window
     {
         _store = store;
         _watcher = watcher;
+        _updates = new UpdateService(store);
         InitializeComponent();
         DataContext = this;
+
+        VersionLabel.Text = $"Версия {UpdateService.CurrentVersion}  ·  Ctrl+Shift+V";
 
         _nav["all"] = NavAll;
         _nav["pinned"] = NavPinned;
@@ -74,6 +83,21 @@ public partial class MainWindow : Window
 
         SelectNav("all");
         Reload(keepSelection: false);
+
+        _updateTimer = new DispatcherTimer { Interval = TimeSpan.FromHours(4) };
+        _updateTimer.Tick += (_, _) => _ = CheckUpdatesAsync(manual: false);
+        _updateTimer.Start();
+
+        Loaded += (_, _) =>
+        {
+            var delay = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1.6) };
+            delay.Tick += (_, _) =>
+            {
+                delay.Stop();
+                _ = CheckUpdatesAsync(manual: false);
+            };
+            delay.Start();
+        };
     }
 
     public void Reload(bool keepSelection = true)
@@ -122,8 +146,115 @@ public partial class MainWindow : Window
 
     public void ForceClose()
     {
+        _updateCts?.Cancel();
         _forceClose = true;
         Close();
+    }
+
+    private async Task CheckUpdatesAsync(bool manual)
+    {
+        try
+        {
+            var info = await _updates.CheckAsync();
+            if (info is null)
+            {
+                if (manual)
+                    Notify("У вас актуальная версия");
+                return;
+            }
+
+            if (!manual && _updates.WasDismissed(info.Version))
+                return;
+
+            ShowUpdateCard(info);
+        }
+        catch (Exception ex)
+        {
+            if (manual)
+                Notify(ex.Message);
+        }
+    }
+
+    private void ShowUpdateCard(UpdateInfo info)
+    {
+        _pendingUpdate = info;
+        UpdateTitle.Text = $"Доступна версия {info.Version}";
+        UpdateHint.Text = UpdateService.IsPortableInstall()
+            ? "Клип скачает файл, заменит себя и откроется снова."
+            : "Клип обновится и откроется снова. Может появиться запрос прав Windows.";
+        UpdateButton.Content = "Обновить";
+        UpdateButton.IsEnabled = true;
+
+        if (UpdateCard.Visibility == Visibility.Visible)
+            return;
+
+        UpdateCard.Visibility = Visibility.Visible;
+        var slide = new TranslateTransform(24, 0);
+        UpdateCard.RenderTransform = slide;
+        UpdateCard.Opacity = 0;
+        var ease = new QuadraticEase { EasingMode = EasingMode.EaseOut };
+        slide.BeginAnimation(
+            TranslateTransform.XProperty,
+            new DoubleAnimation(24, 0, TimeSpan.FromMilliseconds(280)) { EasingFunction = ease });
+        UpdateCard.BeginAnimation(
+            OpacityProperty,
+            new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(220)));
+    }
+
+    private void OnCheckUpdates(object sender, RoutedEventArgs e)
+        => _ = CheckUpdatesAsync(manual: true);
+
+    private void OnUpdateDismiss(object sender, RoutedEventArgs e)
+    {
+        if (_updating)
+            return;
+        if (_pendingUpdate is { } info)
+            _updates.Dismiss(info.Version);
+        UpdateCard.Visibility = Visibility.Collapsed;
+    }
+
+    private async void OnUpdateApply(object sender, RoutedEventArgs e)
+    {
+        if (_pendingUpdate is not { } info || _updating)
+            return;
+
+        _updating = true;
+        _updateCts?.Cancel();
+        _updateCts = new CancellationTokenSource();
+        UpdateButton.IsEnabled = false;
+        UpdateButton.Content = "Загрузка…";
+
+        var progress = new Progress<double>(value =>
+        {
+            UpdateButton.Content = value >= 1
+                ? "Установка…"
+                : $"Загрузка {(int)(value * 100)}%";
+        });
+
+        try
+        {
+            await _updates.ApplyAsync(info, progress, _updateCts.Token);
+            Notify("Установка запущена");
+            if (System.Windows.Application.Current is App app)
+                app.RequestExit();
+            else
+                ForceClose();
+        }
+        catch (OperationCanceledException)
+        {
+            UpdateButton.IsEnabled = true;
+            UpdateButton.Content = "Обновить";
+        }
+        catch (Exception ex)
+        {
+            UpdateButton.IsEnabled = true;
+            UpdateButton.Content = "Обновить";
+            Notify(ex.Message);
+        }
+        finally
+        {
+            _updating = false;
+        }
     }
 
     private void ApplyFilter(long? selectId)

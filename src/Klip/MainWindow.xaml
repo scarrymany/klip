@@ -222,8 +222,14 @@
                                           Content="Запускать с Windows"
                                           Checked="OnStartupChanged"
                                           Unchecked="OnStartupChanged"/>
-                                <TextBlock Text="Ctrl+Shift+V  ·  клик копирует"
-                                           Margin="0,10,0,0"
+                                <Button Style="{StaticResource GhostButton}"
+                                        HorizontalAlignment="Left"
+                                        Padding="0,8,0,0"
+                                        Margin="0,4,0,0"
+                                        Click="OnCheckUpdates"
+                                        Content="Проверить обновления"/>
+                                <TextBlock x:Name="VersionLabel"
+                                           Margin="0,8,0,0"
                                            FontSize="11"
                                            Foreground="{StaticResource SubtleBrush}"/>
                             </StackPanel>
@@ -512,6 +518,52 @@
                 </StackPanel>
             </Border>
         </Grid>
+
+        <Border x:Name="UpdateCard"
+                Visibility="Collapsed"
+                HorizontalAlignment="Right"
+                VerticalAlignment="Top"
+                Width="312"
+                Margin="0,58,16,0"
+                Background="#F216191F"
+                BorderBrush="{StaticResource HairlineStrongBrush}"
+                BorderThickness="1"
+                CornerRadius="16"
+                Padding="16,14"
+                Panel.ZIndex="40">
+            <StackPanel>
+                <Grid>
+                    <TextBlock x:Name="UpdateTitle"
+                               Text="Доступно обновление"
+                               FontSize="14"
+                               FontWeight="SemiBold"
+                               VerticalAlignment="Center"
+                               Margin="0,0,32,0"/>
+                    <Button Style="{StaticResource IconButton}"
+                            HorizontalAlignment="Right"
+                            Width="28" Height="28"
+                            Click="OnUpdateDismiss"
+                            ToolTip="Позже">
+                        <Path Width="9" Height="9" Stretch="Uniform"
+                              Stroke="{StaticResource MutedBrush}" StrokeThickness="1.6"
+                              Data="M1,1 L11,11 M11,1 L1,11"/>
+                    </Button>
+                </Grid>
+                <TextBlock x:Name="UpdateHint"
+                           Margin="0,8,0,14"
+                           FontSize="12"
+                           LineHeight="18"
+                           Foreground="{StaticResource MutedBrush}"
+                           TextWrapping="Wrap"
+                           Text="Новая версия готова. Клип обновится и откроется снова."/>
+                <Button x:Name="UpdateButton"
+                        Style="{StaticResource PrimaryButton}"
+                        HorizontalAlignment="Left"
+                        MinWidth="112"
+                        Click="OnUpdateApply"
+                        Content="Обновить"/>
+            </StackPanel>
+        </Border>
 
         <Border x:Name="ToastHost"
                 Visibility="Collapsed"
