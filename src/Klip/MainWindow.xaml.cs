@@ -325,7 +325,7 @@ public partial class MainWindow : Window
         if (_editing is null && kind == ClipKinds.Clip)
             kind = ClipKinds.Detect(content);
 
-        var collectionId = EditorFolder.SelectedItem is FolderChoice { Id: { } id } ? id : null;
+        var collectionId = (EditorFolder.SelectedItem as FolderChoice)?.Id;
 
         try
         {
