@@ -1,48 +1,71 @@
-using System.Runtime.InteropServices;
 using System.Windows.Interop;
+using Klip.Native;
 
 namespace Klip.Services;
 
 public sealed class HotkeyService : IDisposable
 {
-    public event Action? Pressed;
-
     private HwndSource? _source;
-    private const int HotkeyId = 0x4B4C; // KL
-    private const int WmHotkey = 0x0312;
-    private const uint ModControl = 0x0002;
-    private const uint ModShift = 0x0004;
-    private const uint VkV = 0x56;
+    private bool _registered;
 
-    public bool Register(IntPtr hwnd)
+    public event EventHandler? Activated;
+
+    public bool IsRegistered => _registered;
+
+    public bool Attach(HwndSource source)
     {
-        _source = HwndSource.FromHwnd(hwnd);
-        _source?.AddHook(Hook);
-        return RegisterHotKey(hwnd, HotkeyId, ModControl | ModShift, VkV);
+        Detach();
+        _source = source;
+        _source.AddHook(Hook);
+
+        _registered = NativeMethods.RegisterHotKey(
+            source.Handle,
+            NativeMethods.HotkeyId,
+            NativeMethods.MOD_CONTROL | NativeMethods.MOD_SHIFT | NativeMethods.MOD_NOREPEAT,
+            NativeMethods.VK_V);
+
+        if (!_registered)
+        {
+            _registered = NativeMethods.RegisterHotKey(
+                source.Handle,
+                NativeMethods.HotkeyId,
+                NativeMethods.MOD_CONTROL | NativeMethods.MOD_SHIFT,
+                NativeMethods.VK_V);
+        }
+
+        return _registered;
+    }
+
+    public void Detach()
+    {
+        if (_source is not null)
+        {
+            try
+            {
+                NativeMethods.UnregisterHotKey(_source.Handle, NativeMethods.HotkeyId);
+            }
+            catch
+            {
+                // HWND may already be gone.
+            }
+
+            _source.RemoveHook(Hook);
+            _source = null;
+        }
+
+        _registered = false;
     }
 
     private IntPtr Hook(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
-        if (msg == WmHotkey && wParam.ToInt32() == HotkeyId)
+        if (msg == NativeMethods.WM_HOTKEY && wParam.ToInt32() == NativeMethods.HotkeyId)
         {
-            Pressed?.Invoke();
+            Activated?.Invoke(this, EventArgs.Empty);
             handled = true;
         }
+
         return IntPtr.Zero;
     }
 
-    public void Dispose()
-    {
-        if (_source is not null)
-        {
-            UnregisterHotKey(_source.Handle, HotkeyId);
-            _source.RemoveHook(Hook);
-        }
-    }
-
-    [DllImport("user32.dll", SetLastError = true)]
-    private static extern bool RegisterHotKey(IntPtr hWnd, int id, uint fsModifiers, uint vk);
-
-    [DllImport("user32.dll", SetLastError = true)]
-    private static extern bool UnregisterHotKey(IntPtr hWnd, int id);
+    public void Dispose() => Detach();
 }

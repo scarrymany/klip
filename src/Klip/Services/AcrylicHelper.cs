@@ -1,61 +1,71 @@
-using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
 using System.Windows.Media;
+using Klip.Native;
 
 namespace Klip.Services;
 
 public static class AcrylicHelper
 {
-    private const int DWMWA_USE_IMMERSIVE_DARK_MODE = 20;
-    private const int DWMWA_WINDOW_CORNER_PREFERENCE = 33;
-    private const int DWMWA_SYSTEMBACKDROP_TYPE = 38;
-    private const int DWMWCP_ROUND = 2;
-    private const int DWMSBT_MAINWINDOW = 2; // Mica
-    private const int DWMSBT_TRANSIENTWINDOW = 3; // Acrylic
+    public static readonly Color SolidFallback = Color.FromRgb(0x0B, 0x0D, 0x11);
+    public static readonly Brush SolidFallbackBrush = CreateSolid();
 
-    public static bool TryApply(Window window)
+    public static bool Apply(Window window)
     {
         var hwnd = new WindowInteropHelper(window).EnsureHandle();
-        if (!IsWindows11())
+        var source = HwndSource.FromHwnd(hwnd);
+        if (source?.CompositionTarget is { } target)
+            target.BackgroundColor = Colors.Transparent;
+
+        var dark = 1;
+        NativeMethods.DwmSetWindowAttribute(
+            hwnd, NativeMethods.DWMWA_USE_IMMERSIVE_DARK_MODE, ref dark, sizeof(int));
+        NativeMethods.DwmSetWindowAttribute(
+            hwnd, NativeMethods.DWMWA_USE_IMMERSIVE_DARK_MODE_OLD, ref dark, sizeof(int));
+
+        if (!NativeMethods.IsWindows11())
         {
-            window.Background = new SolidColorBrush(Color.FromRgb(0x0B, 0x0D, 0x11));
+            window.Background = SolidFallbackBrush;
             return false;
         }
 
-        window.Background = Brushes.Transparent;
-        var dark = 1;
-        DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, ref dark, sizeof(int));
-        var corners = DWMWCP_ROUND;
-        DwmSetWindowAttribute(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, ref corners, sizeof(int));
+        var corner = NativeMethods.DWMWCP_ROUND;
+        NativeMethods.DwmSetWindowAttribute(
+            hwnd, NativeMethods.DWMWA_WINDOW_CORNER_PREFERENCE, ref corner, sizeof(int));
 
-        var mica = DWMSBT_MAINWINDOW;
-        if (DwmSetWindowAttribute(hwnd, DWMWA_SYSTEMBACKDROP_TYPE, ref mica, sizeof(int)) != 0)
+        var margins = NativeMethods.Margins.Full;
+        NativeMethods.DwmExtendFrameIntoClientArea(hwnd, ref margins);
+
+        // Prefer mica-like glass: value 3 first (requested), then 4 acrylic/tabbed,
+        // then official Mica (2), then the early Windows 11 mica switch.
+        if (!TryBackdrop(hwnd, NativeMethods.DWMSBT_TRANSIENTWINDOW) &&
+            !TryBackdrop(hwnd, NativeMethods.DWMSBT_TABBEDWINDOW) &&
+            !TryBackdrop(hwnd, NativeMethods.DWMSBT_MAINWINDOW))
         {
-            var acrylic = DWMSBT_TRANSIENTWINDOW;
-            DwmSetWindowAttribute(hwnd, DWMWA_SYSTEMBACKDROP_TYPE, ref acrylic, sizeof(int));
+            var mica = 1;
+            NativeMethods.DwmSetWindowAttribute(
+                hwnd, NativeMethods.DWMWA_MICA_EFFECT, ref mica, sizeof(int));
         }
 
-        var margins = new MARGINS { cxLeftWidth = -1, cxRightWidth = -1, cyTopHeight = -1, cyBottomHeight = -1 };
-        DwmExtendFrameIntoClientArea(hwnd, ref margins);
+        window.Background = System.Windows.Media.Brushes.Transparent;
         return true;
     }
 
-    public static bool IsWindows11()
+    public static bool TryApply(Window window) => Apply(window);
+
+    public static bool IsWindows11() => NativeMethods.IsWindows11();
+
+    private static bool TryBackdrop(IntPtr hwnd, int type)
     {
-        var os = Environment.OSVersion;
-        return os.Platform == PlatformID.Win32NT && os.Version.Build >= 22000;
+        var value = type;
+        return NativeMethods.DwmSetWindowAttribute(
+            hwnd, NativeMethods.DWMWA_SYSTEMBACKDROP_TYPE, ref value, sizeof(int)) == 0;
     }
 
-    [DllImport("dwmapi.dll")]
-    private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int value, int size);
-
-    [DllImport("dwmapi.dll")]
-    private static extern int DwmExtendFrameIntoClientArea(IntPtr hwnd, ref MARGINS margins);
-
-    [StructLayout(LayoutKind.Sequential)]
-    private struct MARGINS
+    private static SolidColorBrush CreateSolid()
     {
-        public int cxLeftWidth, cxRightWidth, cyTopHeight, cyBottomHeight;
+        var brush = new SolidColorBrush(SolidFallback);
+        brush.Freeze();
+        return brush;
     }
 }

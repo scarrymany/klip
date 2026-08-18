@@ -1,4 +1,5 @@
 using System.Drawing;
+using System.IO;
 using System.Windows;
 using WinForms = System.Windows.Forms;
 
@@ -6,50 +7,82 @@ namespace Klip.Services;
 
 public sealed class TrayService : IDisposable
 {
-    private readonly WinForms.NotifyIcon _icon;
+    private readonly WinForms.NotifyIcon _notifyIcon;
+    private readonly Icon _icon;
 
-    public event Action? ShowClicked;
-    public event Action? ExitClicked;
+    public event EventHandler? ShowRequested;
+    public event EventHandler? ExitRequested;
 
     public TrayService()
     {
-        _icon = new WinForms.NotifyIcon
+        _icon = LoadIcon();
+
+        var menu = new WinForms.ContextMenuStrip();
+        menu.Items.Add("Показать", null, (_, _) => ShowRequested?.Invoke(this, EventArgs.Empty));
+        menu.Items.Add(new WinForms.ToolStripSeparator());
+        menu.Items.Add("Выход", null, (_, _) => ExitRequested?.Invoke(this, EventArgs.Empty));
+
+        _notifyIcon = new WinForms.NotifyIcon
         {
-            Text = "Клип — буфер обмена",
+            Text = "Клип",
             Visible = true,
-            Icon = LoadIcon(),
+            Icon = _icon,
+            ContextMenuStrip = menu,
         };
-        _icon.DoubleClick += (_, _) => ShowClicked?.Invoke();
-        _icon.ContextMenuStrip = new WinForms.ContextMenuStrip();
-        _icon.ContextMenuStrip.Items.Add("Открыть", null, (_, _) => ShowClicked?.Invoke());
-        _icon.ContextMenuStrip.Items.Add("Выход", null, (_, _) => ExitClicked?.Invoke());
+        _notifyIcon.MouseClick += OnMouseClick;
     }
 
-    public void Balloon(string text)
+    private void OnMouseClick(object? sender, WinForms.MouseEventArgs e)
     {
-        _icon.BalloonTipTitle = "Клип";
-        _icon.BalloonTipText = text;
-        _icon.ShowBalloonTip(1600);
+        if (e.Button == WinForms.MouseButtons.Left)
+            ShowRequested?.Invoke(this, EventArgs.Empty);
     }
 
     private static Icon LoadIcon()
     {
         try
         {
-            var uri = new Uri("pack://application:,,,/Assets/klip.ico");
-            var stream = Application.GetResourceStream(uri)?.Stream;
-            if (stream is not null) return new Icon(stream);
+            var stream = System.Windows.Application.GetResourceStream(
+                new Uri("pack://application:,,,/Assets/klip.ico"));
+            if (stream?.Stream is { } resource)
+            {
+                using (resource)
+                {
+                    using var copy = new MemoryStream();
+                    resource.CopyTo(copy);
+                    copy.Position = 0;
+                    return new Icon(copy);
+                }
+            }
         }
         catch
         {
-            // fallback
+            // Fall through to the executable icon.
         }
-        return SystemIcons.Application;
+
+        try
+        {
+            var path = Environment.ProcessPath;
+            if (!string.IsNullOrEmpty(path))
+            {
+                var extracted = Icon.ExtractAssociatedIcon(path);
+                if (extracted is not null)
+                    return extracted;
+            }
+        }
+        catch
+        {
+            // Fall through to the stock application icon.
+        }
+
+        return (Icon)SystemIcons.Application.Clone();
     }
 
     public void Dispose()
     {
-        _icon.Visible = false;
+        _notifyIcon.Visible = false;
+        _notifyIcon.MouseClick -= OnMouseClick;
+        _notifyIcon.Dispose();
         _icon.Dispose();
     }
 }

@@ -1,4 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
+
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net9.0-windows</TargetFramework>
@@ -6,29 +7,38 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
     <UseWindowsForms>true</UseWindowsForms>
-    <ApplicationIcon>Assets\klip.ico</ApplicationIcon>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\klip.ico</ApplicationIcon>
     <RootNamespace>Klip</RootNamespace>
     <AssemblyName>Klip</AssemblyName>
     <Version>1.0.0</Version>
-    <AssemblyTitle>Клип</AssemblyTitle>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <FileVersion>1.0.0.0</FileVersion>
+    <InformationalVersion>1.0.0</InformationalVersion>
     <Product>Клип</Product>
+    <AssemblyTitle>Клип</AssemblyTitle>
     <Company>scarrymany</Company>
     <Authors>scarrymany</Authors>
     <Copyright>© 2026 scarrymany</Copyright>
-    <Description>Личный буфер обмена и заметки для Windows 10/11</Description>
-    <NeutralLanguage>ru-RU</NeutralLanguage>
+    <Description>Менеджер буфера обмена для Windows 10 и 11</Description>
+    <NeutralLanguage>ru</NeutralLanguage>
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+    <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
     <PublishSingleFile>true</PublishSingleFile>
+    <SelfContained>true</SelfContained>
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
     <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
     <DebugType>embedded</DebugType>
     <SatelliteResourceLanguages>ru;en</SatelliteResourceLanguages>
+    <ForceDesignerDpiUnaware>false</ForceDesignerDpiUnaware>
   </PropertyGroup>
+
   <ItemGroup>
     <PackageReference Include="Microsoft.Data.Sqlite" Version="9.0.8" />
   </ItemGroup>
+
   <ItemGroup>
     <Resource Include="Assets\klip.ico" />
-    <Resource Include="Assets\logo.png" />
   </ItemGroup>
+
 </Project>

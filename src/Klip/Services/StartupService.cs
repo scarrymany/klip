@@ -1,30 +1,57 @@
+using System.Diagnostics;
 using Microsoft.Win32;
 
 namespace Klip.Services;
 
 public static class StartupService
 {
-    private const string RunKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
-    private const string Name = "Klip";
+    private const string RunKeyPath = @"Software\Microsoft\Windows\CurrentVersion\Run";
+    private const string ValueName = "Klip";
 
     public static bool IsEnabled()
     {
-        using var key = Registry.CurrentUser.OpenSubKey(RunKey, false);
-        return key?.GetValue(Name) is string;
+        try
+        {
+            using var key = Registry.CurrentUser.OpenSubKey(RunKeyPath, writable: false);
+            return key?.GetValue(ValueName) is string value && !string.IsNullOrWhiteSpace(value);
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     public static void SetEnabled(bool enabled)
     {
-        using var key = Registry.CurrentUser.OpenSubKey(RunKey, true) ??
-                        Registry.CurrentUser.CreateSubKey(RunKey);
-        if (enabled)
+        using var key = Registry.CurrentUser.OpenSubKey(RunKeyPath, writable: true)
+            ?? Registry.CurrentUser.CreateSubKey(RunKeyPath, writable: true);
+
+        if (!enabled)
         {
-            var exe = Environment.ProcessPath ?? AppContext.BaseDirectory;
-            key.SetValue(Name, $"\"{exe}\"");
+            key.DeleteValue(ValueName, throwOnMissingValue: false);
+            return;
         }
-        else
+
+        var path = ResolveExecutablePath();
+        if (string.IsNullOrEmpty(path))
+            return;
+
+        key.SetValue(ValueName, $"\"{path}\"");
+    }
+
+    private static string? ResolveExecutablePath()
+    {
+        var path = Environment.ProcessPath;
+        if (!string.IsNullOrWhiteSpace(path))
+            return path;
+
+        try
         {
-            key.DeleteValue(Name, false);
+            return Process.GetCurrentProcess().MainModule?.FileName;
+        }
+        catch
+        {
+            return null;
         }
     }
 }

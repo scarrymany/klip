@@ -90,7 +90,7 @@ public partial class MainWindow : Window
 
     private void Folder_Click(object sender, RoutedEventArgs e)
     {
-        if (sender is Button { DataContext: CollectionItem item })
+        if (sender is System.Windows.Controls.Button { DataContext: CollectionItem item })
         {
             _filter = $"folder:{item.Id}";
             Reload();
@@ -99,7 +99,7 @@ public partial class MainWindow : Window
 
     private void Nav_Click(object sender, RoutedEventArgs e)
     {
-        if (sender is Button { Tag: string tag })
+        if (sender is System.Windows.Controls.Button { Tag: string tag })
         {
             _filter = tag;
             Reload();
@@ -140,7 +140,7 @@ public partial class MainWindow : Window
 
     private void Pin_Click(object sender, RoutedEventArgs e)
     {
-        if (sender is not Button { Tag: long id }) return;
+        if (sender is not System.Windows.Controls.Button { Tag: long id }) return;
         var item = _store.Get(id);
         if (item is null) return;
         item.Pinned = !item.Pinned;
@@ -150,7 +150,7 @@ public partial class MainWindow : Window
 
     private void Delete_Click(object sender, RoutedEventArgs e)
     {
-        if (sender is not Button { Tag: long id }) return;
+        if (sender is not System.Windows.Controls.Button { Tag: long id }) return;
         _store.Delete(id);
         Reload();
     }
