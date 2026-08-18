@@ -352,7 +352,6 @@
                                             <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Top">
                                                 <Button Style="{StaticResource IconButton}" Click="OnPinClick" ToolTip="Закрепить">
                                                     <Path Width="12" Height="12" Stretch="Uniform"
-                                                          Fill="{Binding Pinned, Converter={x:Null}}"
                                                           Stroke="{StaticResource MutedBrush}"
                                                           StrokeThickness="1.2"
                                                           Data="M12 2 L15 8 L21.5 9 L16.8 13.6 L18 20 L12 16.8 L6 20 L7.2 13.6 L2.5 9 L9 8 Z">
@@ -399,7 +398,7 @@
                                                FontWeight="SemiBold"
                                                HorizontalAlignment="Center"/>
                                     <TextBlock x:Name="EmptyHint"
-                                               Text="Скопируйте текст в любой программе — он появится здесь. Нажмите на карточку, чтобы вернуть его в буфер."
+                                               Text="Скопируйте текст в любой программе - он появится здесь. Нажмите на карточку, чтобы вернуть его в буфер."
                                                Margin="0,10,0,0"
                                                TextWrapping="Wrap"
                                                TextAlignment="Center"
@@ -496,8 +495,16 @@
                               Height="38"
                               Padding="10,6"
                               BorderBrush="{StaticResource HairlineBrush}"
-                              Background="{StaticResource GlassBrush}"
-                              Foreground="{StaticResource FgBrush}"/>
+                              Background="#1A13161C"
+                              Foreground="{StaticResource FgBrush}">
+                        <ComboBox.Resources>
+                            <SolidColorBrush x:Key="{x:Static SystemColors.WindowBrushKey}" Color="#13161C"/>
+                            <SolidColorBrush x:Key="{x:Static SystemColors.WindowTextBrushKey}" Color="#EEF1F5"/>
+                            <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}" Color="#3AD7DDE6"/>
+                            <SolidColorBrush x:Key="{x:Static SystemColors.HighlightTextBrushKey}" Color="#0B0D11"/>
+                            <SolidColorBrush x:Key="{x:Static SystemColors.ControlBrushKey}" Color="#13161C"/>
+                        </ComboBox.Resources>
+                    </ComboBox>
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,18,0,0">
                         <Button Style="{StaticResource GhostButton}" Content="Отмена" Padding="16,8" Click="OnEditorCancel"/>
                         <Button Style="{StaticResource PrimaryButton}" Content="Сохранить" Margin="8,0,0,0" Padding="18,8" Click="OnEditorSave"/>

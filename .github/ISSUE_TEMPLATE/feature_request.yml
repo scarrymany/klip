@@ -1,14 +1,25 @@
 name: Идея
-description: Предложение по Клипу
-labels: [enhancement]
+description: Предложить новую возможность или улучшение
+title: "[идея] "
+labels: ["enhancement"]
 body:
   - type: textarea
-    id: idea
+    id: problem
     attributes:
-      label: Что добавить
+      label: Какую задачу это решает
+      description: Опишите ситуацию, в которой текущей функциональности не хватает.
     validations:
       required: true
+
   - type: textarea
-    id: why
+    id: proposal
     attributes:
-      label: Зачем это нужно
+      label: Предложение
+      description: Как это могло бы работать.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Что пробовали вместо этого

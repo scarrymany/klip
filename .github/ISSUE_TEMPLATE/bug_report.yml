@@ -1,32 +1,70 @@
-name: Ошибка
-description: Что-то сломалось в Клипе
-labels: [bug]
+name: Баг
+description: Программа падает, теряет записи или ведёт себя странно
+title: "[баг] "
+labels: ["bug"]
 body:
+  - type: markdown
+    attributes:
+      value: |
+        Спасибо за отчёт. Чем точнее описание, тем быстрее получится повторить
+        и починить.
+
   - type: textarea
-    id: what
+    id: what-happened
     attributes:
       label: Что произошло
-      description: Ожидание и факт
+      description: Опишите проблему и что вы ожидали увидеть.
+      placeholder: После копирования ссылки запись не появляется в списке.
     validations:
       required: true
-  - type: input
-    id: version
+
+  - type: textarea
+    id: steps
     attributes:
-      label: Версия
-      placeholder: 1.0.0
+      label: Как повторить
+      description: Шаги от запуска программы до ошибки.
+      placeholder: |
+        1. Запустить Клип
+        2. Скопировать текст в блокноте
+        3. Нажать Ctrl+Shift+V
     validations:
       required: true
+
   - type: dropdown
     id: os
     attributes:
-      label: Система
+      label: Операционная система
       options:
         - Windows 11
         - Windows 10
+        - Другое
     validations:
       required: true
-  - type: textarea
-    id: repro
+
+  - type: input
+    id: version
     attributes:
-      label: Как повторить
-      placeholder: 1. Скопировал текст...
+      label: Версия Клип
+      description: Показывает окно «О программе» или имя файла из релиза.
+      placeholder: 1.0.0
+    validations:
+      required: true
+
+  - type: dropdown
+    id: install-method
+    attributes:
+      label: Способ установки
+      options:
+        - Установщик Setup.exe
+        - MSI
+        - Портативный zip
+        - Из исходников
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Сообщение об ошибке
+      description: Если программа показала ошибку, вставьте текст целиком.
+      render: text

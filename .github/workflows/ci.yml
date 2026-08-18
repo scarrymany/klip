@@ -4,15 +4,26 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
     name: сборка
     runs-on: windows-latest
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v5
         with:
           dotnet-version: "9.0.x"
-      - run: dotnet restore Klip.sln
-      - run: dotnet build Klip.sln -c Release --no-restore
+
+      - name: Восстановление
+        run: dotnet restore Klip.sln
+
+      - name: Сборка
+        run: dotnet build Klip.sln -c Release --no-restore

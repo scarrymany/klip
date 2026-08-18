@@ -61,30 +61,38 @@ public partial class App : System.Windows.Application
             // Visual styles are optional for the tray menu.
         }
 
-        _store = new ClipStore();
-        _watcher = new ClipboardWatcher();
-        _hotkey = new HotkeyService();
-        _tray = new TrayService();
-
-        _window = new MainWindow(_store, _watcher);
-        MainWindow = _window;
-
-        _watcher.Start();
-        _watcher.TextCaptured += OnClipboardText;
-
-        if (_watcher.Source is HwndSource source)
+        try
         {
-            source.AddHook(SingleInstanceHook);
-            if (!_hotkey.Attach(source))
-                _window.Notify("Горячая клавиша Ctrl+Shift+V занята");
+            _store = new ClipStore();
+            _watcher = new ClipboardWatcher();
+            _hotkey = new HotkeyService();
+            _tray = new TrayService();
+
+            _window = new MainWindow(_store, _watcher);
+            MainWindow = _window;
+
+            _watcher.Start();
+            _watcher.TextCaptured += OnClipboardText;
+
+            if (_watcher.Source is HwndSource source)
+            {
+                source.AddHook(SingleInstanceHook);
+                if (!_hotkey.Attach(source))
+                    _window.Notify("Горячая клавиша Ctrl+Shift+V занята");
+            }
+
+            _hotkey.Activated += (_, _) => Dispatcher.Invoke(ToggleWindow);
+            _tray.ShowRequested += (_, _) => Dispatcher.Invoke(RevealWindow);
+            _tray.ExitRequested += (_, _) => Dispatcher.Invoke(RequestExit);
+
+            _window.Show();
+            RestoreWindowBounds();
         }
-
-        _hotkey.Activated += (_, _) => Dispatcher.Invoke(ToggleWindow);
-        _tray.ShowRequested += (_, _) => Dispatcher.Invoke(RevealWindow);
-        _tray.ExitRequested += (_, _) => Dispatcher.Invoke(RequestExit);
-
-        _window.Show();
-        RestoreWindowBounds();
+        catch (Exception ex)
+        {
+            System.Windows.MessageBox.Show(ex.Message, "Клип", MessageBoxButton.OK, MessageBoxImage.Error);
+            Shutdown();
+        }
     }
 
     private void OnClipboardText(object? sender, string text)

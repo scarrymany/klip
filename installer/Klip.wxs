@@ -1,47 +1,69 @@
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
-  <Package
-    Name="Клип"
-    Manufacturer="scarrymany"
-    Version="1.0.0"
-    UpgradeCode="7c3e9a12-8b44-4f21-9d80-2a6f1c4e5b70"
-    Language="1049"
-    Scope="perMachine">
-    <SummaryInformation Description="Личный буфер обмена и заметки для Windows 10/11" />
-    <MajorUpgrade DowngradeErrorMessage="Более новая версия Клипа уже установлена." />
-    <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
-    <Icon Id="AppIcon" SourceFile="src\Klip\Assets\klip.ico" />
-    <Property Id="ARPPRODUCTICON" Value="AppIcon" />
-    <Property Id="ARPHELPLINK" Value="https://github.com/scarrymany/klip" />
+  <?ifndef PublishDir ?>
+    <?define PublishDir = "$(sys.SOURCEFILEDIR)..\dist\app" ?>
+  <?endif?>
+  <?ifndef ProductVersion ?>
+    <?define ProductVersion = "1.0.0" ?>
+  <?endif?>
+
+  <Package Name="Клип"
+           Language="1049"
+           Version="$(var.ProductVersion)"
+           Manufacturer="scarrymany"
+           UpgradeCode="9C4E2B71-6A18-4F3D-8E05-B2D47C91A6F3"
+           Scope="perMachine"
+           InstallerVersion="500">
+    <SummaryInformation Description="Менеджер буфера обмена для Windows"
+                        Manufacturer="scarrymany" />
+
+    <MajorUpgrade DowngradeErrorMessage="Уже установлена более новая версия Клип. Удалите её, если хотите поставить эту."
+                  Schedule="afterInstallInitialize" />
+    <MediaTemplate EmbedCab="yes" />
+
+    <Icon Id="KlipIcon" SourceFile="$(var.PublishDir)\Klip.exe" />
+    <Property Id="ARPPRODUCTICON" Value="KlipIcon" />
+    <Property Id="ARPHELPLINK" Value="https://github.com/scarrymany/klip/issues" />
     <Property Id="ARPURLINFOABOUT" Value="https://github.com/scarrymany/klip" />
+    <Property Id="ARPURLUPDATEINFO" Value="https://github.com/scarrymany/klip/releases" />
+    <Property Id="ARPCOMMENTS" Value="Менеджер буфера обмена" />
+    <Property Id="ARPNOREPAIR" Value="yes" />
 
     <StandardDirectory Id="ProgramFiles64Folder">
       <Directory Id="INSTALLFOLDER" Name="Klip" />
     </StandardDirectory>
-    <StandardDirectory Id="ProgramMenuFolder">
-      <Directory Id="AppStartMenu" Name="Клип" />
-    </StandardDirectory>
-    <StandardDirectory Id="DesktopFolder" />
 
-    <Feature Id="Main" Title="Клип" Level="1">
-      <Component Directory="INSTALLFOLDER" Guid="b91e2c44-0d77-4a1a-9f10-66c1d2aa9011">
-        <File Id="KlipExe" Source="$(PublishDir)\Klip.exe" KeyPath="yes" />
-        <Shortcut
-          Id="StartMenuShortcut"
-          Name="Клип"
-          Directory="AppStartMenu"
-          WorkingDirectory="INSTALLFOLDER"
-          Icon="AppIcon"
-          Advertise="no" />
-        <Shortcut
-          Id="DesktopShortcut"
-          Name="Клип"
-          Directory="DesktopFolder"
-          WorkingDirectory="INSTALLFOLDER"
-          Icon="AppIcon"
-          Advertise="no" />
-        <RemoveFolder Id="RemoveStartMenu" Directory="AppStartMenu" On="uninstall" />
-        <RegistryValue Root="HKCU" Key="Software\scarrymany\Klip" Name="installed" Type="integer" Value="1" />
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="AppMenuFolder" Name="Klip" />
+    </StandardDirectory>
+
+    <ComponentGroup Id="AppFiles" Directory="INSTALLFOLDER">
+      <Component Id="KlipExe" Guid="C8A1D4E2-7B35-4F09-9A16-5E3C8D2B7041">
+        <File Id="KlipExeFile"
+              Source="$(var.PublishDir)\Klip.exe"
+              KeyPath="yes"
+              Checksum="yes" />
       </Component>
+    </ComponentGroup>
+
+    <Component Id="StartMenuShortcut" Directory="AppMenuFolder" Guid="D4B7E1A9-2C68-4E15-8F30-6A9D1C5B8342">
+      <Shortcut Id="StartMenuKlip"
+                Name="Клип"
+                Description="Менеджер буфера обмена"
+                Target="[INSTALLFOLDER]Klip.exe"
+                WorkingDirectory="INSTALLFOLDER"
+                Icon="KlipIcon" />
+      <RemoveFolder Id="RemoveAppMenuFolder" On="uninstall" />
+      <RegistryValue Root="HKMU"
+                     Key="Software\scarrymany\Klip"
+                     Name="StartMenu"
+                     Type="integer"
+                     Value="1"
+                     KeyPath="yes" />
+    </Component>
+
+    <Feature Id="ProductFeature" Title="Клип" Level="1" AllowAbsent="no">
+      <ComponentGroupRef Id="AppFiles" />
+      <ComponentRef Id="StartMenuShortcut" />
     </Feature>
   </Package>
 </Wix>

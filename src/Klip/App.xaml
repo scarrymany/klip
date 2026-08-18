@@ -382,6 +382,21 @@
                                 <Path x:Name="Arrow" Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center"
                                       Data="M0,0 L4,4 L0,8" Stroke="{StaticResource MutedBrush}" StrokeThickness="1.2"
                                       Visibility="Collapsed"/>
+                                <Popup x:Name="PART_Popup"
+                                       Placement="Right"
+                                       HorizontalOffset="6"
+                                       AllowsTransparency="True"
+                                       Focusable="False"
+                                       IsOpen="{Binding IsSubmenuOpen, RelativeSource={RelativeSource TemplatedParent}}">
+                                    <Border Background="#F213161C"
+                                            BorderBrush="{StaticResource HairlineStrongBrush}"
+                                            BorderThickness="1"
+                                            CornerRadius="12"
+                                            Padding="6"
+                                            MinWidth="140">
+                                        <StackPanel IsItemsHost="True"/>
+                                    </Border>
+                                </Popup>
                             </Grid>
                         </Border>
                         <ControlTemplate.Triggers>
@@ -395,6 +410,19 @@
                                 <Setter Property="Opacity" Value="0.4"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style TargetType="Separator">
+            <Setter Property="Background" Value="#22EEF1F5"/>
+            <Setter Property="Margin" Value="8,6"/>
+            <Setter Property="Height" Value="1"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Separator">
+                        <Border Height="1" Background="{TemplateBinding Background}" Margin="{TemplateBinding Margin}"/>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>

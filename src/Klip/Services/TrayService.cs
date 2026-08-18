@@ -51,7 +51,8 @@ public sealed class TrayService : IDisposable
                     using var copy = new MemoryStream();
                     resource.CopyTo(copy);
                     copy.Position = 0;
-                    return new Icon(copy);
+                    using var tmp = new Icon(copy);
+                    return (Icon)tmp.Clone();
                 }
             }
         }

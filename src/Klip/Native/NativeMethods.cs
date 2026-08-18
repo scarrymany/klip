@@ -122,6 +122,7 @@ internal static class NativeMethods
         var info = new OsVersionInfoW
         {
             dwOSVersionInfoSize = (uint)Marshal.SizeOf<OsVersionInfoW>(),
+            szCSDVersion = string.Empty,
         };
         if (RtlGetVersion(ref info) != 0)
             return (10, 0, 0);

@@ -12,65 +12,97 @@ jobs:
   build:
     name: Windows x64
     runs-on: windows-latest
+    outputs:
+      version: ${{ steps.ver.outputs.version }}
+
     steps:
       - uses: actions/checkout@v4
+
+      - name: Version
+        id: ver
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=1.0.0" >> "$GITHUB_OUTPUT"
+          fi
 
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: "9.0.x"
 
-      - name: Сборка
+      - name: Build
         run: |
           dotnet restore Klip.sln
-          dotnet build Klip.sln -c Release --no-restore
+          dotnet build Klip.sln -c Release --no-restore -p:Version=${{ steps.ver.outputs.version }}
           dotnet publish src/Klip/Klip.csproj -c Release -r win-x64 --self-contained true `
             -p:PublishSingleFile=true `
             -p:IncludeNativeLibrariesForSelfExtract=true `
             -p:EnableCompressionInSingleFile=true `
             -p:DebugType=embedded `
+            -p:Version=${{ steps.ver.outputs.version }} `
             -o dist/app
 
-      - name: Проверка exe
+      - name: Check exe
         run: |
           if (-not (Test-Path dist/app/Klip.exe)) { throw "Klip.exe не собран" }
           Get-Item dist/app/Klip.exe | Format-List Name, Length
 
       - name: Portable ZIP
-        run: |
-          Compress-Archive -Path dist/app/* -DestinationPath dist/Klip-Portable-win-x64.zip -Force
+        shell: pwsh
+        run: Compress-Archive -Path dist/app/Klip.exe -DestinationPath dist/Klip-Portable-win-x64.zip -Force
 
       - name: Inno Setup EXE
+        shell: pwsh
         run: |
-          choco install innosetup -y --no-progress
-          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" installer\klip.iss
+          choco install innosetup --no-progress -y
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { throw "ISCC.exe не найден" }
+          $root = (Resolve-Path .).Path
+          & $iscc installer\klip.iss `
+            "/DMyAppVersion=${{ steps.ver.outputs.version }}" `
+            "/DPublishDir=$root\dist\app" `
+            "/DOutputDir=$root\dist"
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup завершился с кодом $LASTEXITCODE" }
 
       - name: WiX MSI
+        shell: pwsh
         run: |
           dotnet tool install --global wix --version 5.0.2
-          wix build installer/Klip.wxs -d PublishDir=dist/app -o dist/Klip-1.0.0-win-x64.msi -nologo
+          $env:PATH = "$env:USERPROFILE\.dotnet\tools;$env:PATH"
+          wix build installer\Klip.wxs `
+            -d PublishDir="$PWD\dist\app" `
+            -d ProductVersion="${{ steps.ver.outputs.version }}" `
+            -o "dist\Klip-${{ steps.ver.outputs.version }}-win-x64.msi"
 
-      - name: Контрольные суммы
+      - name: Checksums
         shell: bash
         run: |
           cd dist
-          sha256sum Klip-Setup-1.0.0.exe Klip-1.0.0-win-x64.msi Klip-Portable-win-x64.zip > SHA256SUMS.txt
+          sha256sum \
+            "Klip-Setup-${{ steps.ver.outputs.version }}.exe" \
+            "Klip-${{ steps.ver.outputs.version }}-win-x64.msi" \
+            Klip-Portable-win-x64.zip \
+            > SHA256SUMS.txt
           cat SHA256SUMS.txt
 
       - uses: actions/upload-artifact@v4
         with:
           name: windows-installers
+          if-no-files-found: error
           path: |
-            dist/Klip-Setup-1.0.0.exe
-            dist/Klip-1.0.0-win-x64.msi
+            dist/Klip-Setup-${{ steps.ver.outputs.version }}.exe
+            dist/Klip-${{ steps.ver.outputs.version }}-win-x64.msi
             dist/Klip-Portable-win-x64.zip
             dist/SHA256SUMS.txt
-          if-no-files-found: error
 
   publish:
     name: публикация релиза
     runs-on: ubuntu-latest
     needs: build
     if: startsWith(github.ref, 'refs/tags/')
+
     steps:
       - uses: actions/checkout@v4
 
@@ -92,9 +124,9 @@ jobs:
 
             | Файл | Для чего |
             | --- | --- |
-            | `Klip-Setup-1.0.0.exe` | Установщик Inno Setup — ярлыки, автозагрузка, русский мастер |
-            | `Klip-1.0.0-win-x64.msi` | MSI для тихой установки и групповых политик |
-            | `Klip-Portable-win-x64.zip` | Без установки, можно с флешки |
+            | `Klip-Setup-1.0.0.exe` | Установщик Inno Setup — ярлыки, русский мастер |
+            | `Klip-1.0.0-win-x64.msi` | MSI для тихой установки |
+            | `Klip-Portable-win-x64.zip` | Без установки |
             | `SHA256SUMS.txt` | Контрольные суммы |
 
-            Горячая клавиша после запуска: **Ctrl + Shift + V**.
+            После запуска: **Ctrl + Shift + V**.

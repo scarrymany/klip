@@ -1,6 +1,8 @@
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Klip", "src\Klip\Klip.csproj", "{8F2A1C0E-7B64-4D91-9C33-0A1B2C3D4E5F}"
+VisualStudioVersion = 17.12.35527.113
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Klip", "src\Klip\Klip.csproj", "{A1C3E5F7-294B-4D6E-8F10-3A5C7E9B1D24}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -8,9 +10,15 @@ Global
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{8F2A1C0E-7B64-4D91-9C33-0A1B2C3D4E5F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{8F2A1C0E-7B64-4D91-9C33-0A1B2C3D4E5F}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{8F2A1C0E-7B64-4D91-9C33-0A1B2C3D4E5F}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{8F2A1C0E-7B64-4D91-9C33-0A1B2C3D4E5F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A1C3E5F7-294B-4D6E-8F10-3A5C7E9B1D24}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A1C3E5F7-294B-4D6E-8F10-3A5C7E9B1D24}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A1C3E5F7-294B-4D6E-8F10-3A5C7E9B1D24}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A1C3E5F7-294B-4D6E-8F10-3A5C7E9B1D24}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {E4B7C1A2-8F3D-4A19-9E6B-2C5D7F1A4E80}
 	EndGlobalSection
 EndGlobal

@@ -1,9 +1,12 @@
 #define MyAppName "Клип"
 #define MyAppNameEn "Klip"
-#define MyAppVersion "1.0.0"
 #define MyAppPublisher "scarrymany"
 #define MyAppURL "https://github.com/scarrymany/klip"
 #define MyAppExeName "Klip.exe"
+
+#ifndef MyAppVersion
+  #define MyAppVersion "1.0.0"
+#endif
 
 #ifndef PublishDir
   #define PublishDir "..\dist\app"
@@ -14,7 +17,7 @@
 #endif
 
 [Setup]
-AppId={{7C3E9A12-8B44-4F21-9D80-2A6F1C4E5B70}
+AppId={{6D1A8E4C-2F90-4B3A-9C17-E5D8A0B4F216}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppVerName={#MyAppName} {#MyAppVersion}
@@ -22,6 +25,7 @@ AppPublisher={#MyAppPublisher}
 AppPublisherURL={#MyAppURL}
 AppSupportURL={#MyAppURL}/issues
 AppUpdatesURL={#MyAppURL}/releases
+AppCopyright=Copyright (C) 2026 {#MyAppPublisher}
 DefaultDirName={autopf}\Klip
 DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
@@ -40,31 +44,37 @@ ArchitecturesInstallIn64BitMode=x64compatible
 MinVersion=10.0
 VersionInfoVersion={#MyAppVersion}
 VersionInfoCompany={#MyAppPublisher}
-VersionInfoDescription=Личный буфер обмена и заметки
+VersionInfoDescription={#MyAppName} setup
 VersionInfoProductName={#MyAppName}
+VersionInfoProductVersion={#MyAppVersion}
+ShowLanguageDialog=yes
+UsePreviousLanguage=yes
 CloseApplications=yes
 RestartApplications=no
-UsedUserAreasWarning=no
 
 [Languages]
 Name: "russian"; MessagesFile: "compiler:Languages\Russian.isl"
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]
-Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"
-Name: "startup"; Description: "Запускать вместе с Windows"; Flags: unchecked
+Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
 [Files]
-Source: "{#PublishDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#PublishDir}\Klip.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#PublishDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs skipifsourcedoesntexist
 
 [Icons]
-Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
-Name: "{group}\{cm:UninstallProgram,{#MyAppName}}"; Filename: "{uninstallexe}"
-Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
-Name: "{userstartup}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: startup
+Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Comment: "Менеджер буфера обмена"
+Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon; Comment: "Менеджер буфера обмена"
 
 [Run]
-Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#MyAppName}}"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
 
 [UninstallDelete]
-Type: filesandordirs; Name: "{localappdata}\Klip"
+Type: filesandordirs; Name: "{userappdata}\Klip"
+
+[Code]
+function InitializeSetup(): Boolean;
+begin
+  Result := True;
+end;
