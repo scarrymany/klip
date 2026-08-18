@@ -3,6 +3,12 @@
 Формат основан на [Keep a Changelog](https://keepachangelog.com/ru/1.1.0/),
 нумерация версий следует [семантическому версионированию](https://semver.org/lang/ru/).
 
+## [1.0.8] - 2026-08-18
+
+### Исправлено
+
+- Белые треугольники в углах: окно стало layered (`AllowsTransparency`). Углы реально прозрачные, без `SetWindowRgn` и без белой подложки Win32.
+
 ## [1.0.7] - 2026-08-18
 
 ### Исправлено
@@ -80,6 +86,7 @@
   и сплошной фон `#0B0D11` на Windows 10.
 - Сборка одним файлом win-x64, установщик Inno Setup, MSI на WiX и портативный zip.
 
+[1.0.8]: https://github.com/scarrymany/klip/releases/tag/v1.0.8
 [1.0.7]: https://github.com/scarrymany/klip/releases/tag/v1.0.7
 [1.0.6]: https://github.com/scarrymany/klip/releases/tag/v1.0.6
 [1.0.5]: https://github.com/scarrymany/klip/releases/tag/v1.0.5

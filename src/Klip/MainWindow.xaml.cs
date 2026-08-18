@@ -937,19 +937,13 @@ public partial class MainWindow : Window
         var hasPhoto = ApplyWallpaper(tint);
         var useAcrylic = _theme.Acrylic && !hasPhoto;
 
-        if (useAcrylic && AcrylicHelper.Apply(this))
-        {
-            WindowCorners.ClipHost = false;
-            WindowFrame.Background = new SolidColorBrush(Color.FromArgb(0x66, tint.R, tint.G, tint.B));
-        }
+        AcrylicHelper.RemoveBackdrop(this, tint);
+        if (hasPhoto)
+            WindowFrame.Background = System.Windows.Media.Brushes.Transparent;
+        else if (useAcrylic)
+            WindowFrame.Background = new SolidColorBrush(Color.FromArgb(0xCC, tint.R, tint.G, tint.B));
         else
-        {
-            AcrylicHelper.RemoveBackdrop(this, tint);
-            WindowCorners.ClipHost = true;
-            WindowFrame.Background = hasPhoto
-                ? System.Windows.Media.Brushes.Transparent
-                : new SolidColorBrush(tint);
-        }
+            WindowFrame.Background = new SolidColorBrush(tint);
 
         ApplyWindowShape();
     }

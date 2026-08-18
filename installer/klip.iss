@@ -5,7 +5,7 @@
 #define MyAppExeName "Klip.exe"
 
 #ifndef MyAppVersion
-  #define MyAppVersion "1.0.7"
+  #define MyAppVersion "1.0.8"
 #endif
 
 #ifndef PublishDir

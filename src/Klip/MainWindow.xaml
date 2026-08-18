@@ -7,6 +7,7 @@
         MinWidth="740" MinHeight="500"
         WindowStartupLocation="CenterScreen"
         WindowStyle="None"
+        AllowsTransparency="True"
         ResizeMode="CanResize"
         Background="Transparent"
         Foreground="{StaticResource FgBrush}"
@@ -23,7 +24,7 @@
     <WindowChrome.WindowChrome>
         <WindowChrome CaptionHeight="48"
                       ResizeBorderThickness="6"
-                      GlassFrameThickness="-1"
+                      GlassFrameThickness="0"
                       CornerRadius="16"
                       UseAeroCaptionButtons="False"
                       NonClientFrameEdges="None"/>
