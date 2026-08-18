@@ -153,12 +153,18 @@ public sealed class UpdateService
         var text = await Http.GetStringAsync(checksumsUrl, cancellationToken).ConfigureAwait(false);
         foreach (var raw in text.Split('\n'))
         {
-            var line = raw.Trim();
+            var line = raw.Trim().TrimStart('\uFEFF');
             if (line.Length == 0)
                 continue;
-            var parts = line.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
-            if (parts.Length >= 2 && parts[^1].Equals(assetName, StringComparison.OrdinalIgnoreCase))
-                return parts[0];
+
+            var space = line.IndexOfAny([' ', '\t']);
+            if (space <= 0)
+                continue;
+
+            var hash = line[..space].Trim();
+            var name = line[space..].Trim().TrimStart('*');
+            if (name.Equals(assetName, StringComparison.OrdinalIgnoreCase) && hash.Length >= 32)
+                return hash;
         }
 
         throw new InvalidOperationException("В SHA256SUMS.txt нет этого файла.");

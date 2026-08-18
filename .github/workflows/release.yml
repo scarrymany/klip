@@ -80,11 +80,14 @@ jobs:
         shell: bash
         run: |
           cd dist
-          sha256sum \
-            "Klip-Setup-${{ steps.ver.outputs.version }}.exe" \
-            "Klip-${{ steps.ver.outputs.version }}-win-x64.msi" \
-            Klip-Portable-win-x64.zip \
-            > SHA256SUMS.txt
+          ver="${{ steps.ver.outputs.version }}"
+          # Text-mode names (two spaces, no *). Windows Git sha256sum
+          # otherwise emits `hash *file` and old clients cannot parse it.
+          {
+            echo "$(sha256sum "Klip-Setup-${ver}.exe" | awk '{print $1}')  Klip-Setup-${ver}.exe"
+            echo "$(sha256sum "Klip-${ver}-win-x64.msi" | awk '{print $1}')  Klip-${ver}-win-x64.msi"
+            echo "$(sha256sum Klip-Portable-win-x64.zip | awk '{print $1}')  Klip-Portable-win-x64.zip"
+          } > SHA256SUMS.txt
           cat SHA256SUMS.txt
 
       - uses: actions/upload-artifact@v4
@@ -124,8 +127,8 @@ jobs:
 
             | Файл | Для чего |
             | --- | --- |
-            | `Klip-Setup-1.0.2.exe` | Установщик Inno Setup — ярлыки, русский мастер |
-            | `Klip-1.0.2-win-x64.msi` | MSI для тихой установки |
+            | `Klip-Setup-1.0.3.exe` | Установщик Inno Setup — ярлыки, русский мастер |
+            | `Klip-1.0.3-win-x64.msi` | MSI для тихой установки |
             | `Klip-Portable-win-x64.zip` | Без установки |
             | `SHA256SUMS.txt` | Контрольные суммы |
 

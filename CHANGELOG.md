@@ -3,6 +3,12 @@
 Формат основан на [Keep a Changelog](https://keepachangelog.com/ru/1.1.0/),
 нумерация версий следует [семантическому версионированию](https://semver.org/lang/ru/).
 
+## [1.0.3] - 2026-08-18
+
+### Исправлено
+
+- Автообновление находило `*Klip-Setup-….exe` в `SHA256SUMS.txt` (формат Git Bash на Windows) и отказывалось ставить релиз.
+
 ## [1.0.2] - 2026-08-18
 
 ### Добавлено
@@ -45,6 +51,7 @@
   и сплошной фон `#0B0D11` на Windows 10.
 - Сборка одним файлом win-x64, установщик Inno Setup, MSI на WiX и портативный zip.
 
+[1.0.3]: https://github.com/scarrymany/klip/releases/tag/v1.0.3
 [1.0.2]: https://github.com/scarrymany/klip/releases/tag/v1.0.2
 [1.0.1]: https://github.com/scarrymany/klip/releases/tag/v1.0.1
 [1.0.0]: https://github.com/scarrymany/klip/releases/tag/v1.0.0
