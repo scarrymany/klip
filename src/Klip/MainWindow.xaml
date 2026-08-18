@@ -116,7 +116,7 @@
                                 <RowDefinition Height="*"/>
                                 <RowDefinition Height="Auto"/>
                             </Grid.RowDefinitions>
-                            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                            <ScrollViewer x:Name="SideScroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                                 <StackPanel>
                                     <Button x:Name="NavAll" Style="{StaticResource NavButton}" Click="OnNavClick" Tag="all">
                                         <Grid>
@@ -303,7 +303,8 @@
                             </Grid>
                         </Border>
 
-                        <Grid Grid.Row="1">
+                        <Grid x:Name="ClipStage" Grid.Row="1" ClipToBounds="True">
+                            <Grid x:Name="ClipPane" RenderTransformOrigin="0.5,0.08">
                             <ListBox x:Name="ClipList"
                                      ItemsSource="{Binding VisibleClips}"
                                      MouseDoubleClick="OnClipDoubleClick"
@@ -427,6 +428,7 @@
                                                Foreground="{StaticResource MutedBrush}"/>
                                 </StackPanel>
                             </Border>
+                            </Grid>
                         </Grid>
                     </Grid>
                 </Grid>
@@ -569,7 +571,7 @@
                                   Data="M1,1 L11,11 M11,1 L1,11"/>
                         </Button>
                     </Grid>
-                    <ScrollViewer Grid.Row="1" Style="{StaticResource OverlayScroll}">
+                    <ScrollViewer x:Name="SettingsScroll" Grid.Row="1" Style="{StaticResource OverlayScroll}">
                         <StackPanel Margin="22,4,22,20">
                             <TextBlock Text="Окно" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource SubtleBrush}"/>
                             <CheckBox x:Name="SettingsAcrylic"

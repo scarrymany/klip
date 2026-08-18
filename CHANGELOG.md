@@ -3,6 +3,13 @@
 Формат основан на [Keep a Changelog](https://keepachangelog.com/ru/1.1.0/),
 нумерация версий следует [семантическому версионированию](https://semver.org/lang/ru/).
 
+## [1.0.9] - 2026-08-18
+
+### Добавлено
+
+- Плавная прокрутка в настройках, списке записей и боковой панели.
+- Переход между разделами буфера с лёгким сдвигом и проявлением.
+
 ## [1.0.8] - 2026-08-18
 
 ### Исправлено
@@ -86,6 +93,7 @@
   и сплошной фон `#0B0D11` на Windows 10.
 - Сборка одним файлом win-x64, установщик Inno Setup, MSI на WiX и портативный zip.
 
+[1.0.9]: https://github.com/scarrymany/klip/releases/tag/v1.0.9
 [1.0.8]: https://github.com/scarrymany/klip/releases/tag/v1.0.8
 [1.0.7]: https://github.com/scarrymany/klip/releases/tag/v1.0.7
 [1.0.6]: https://github.com/scarrymany/klip/releases/tag/v1.0.6

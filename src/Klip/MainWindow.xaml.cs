@@ -40,7 +40,10 @@ public partial class MainWindow : Window
     private string? _wallpaperLoaded;
     private bool _appearanceReady;
     private bool _overlayClosing;
+    private bool _navReady;
     private DispatcherTimer? _overlayHide;
+
+    private static readonly string[] NavOrder = ["all", "pinned", "clip", "note", "code", "link"];
 
     public ObservableCollection<ClipItem> VisibleClips => _visible;
 
@@ -90,6 +93,15 @@ public partial class MainWindow : Window
 
         SelectNav("all");
         Reload(keepSelection: false);
+        _navReady = true;
+
+        Loaded += (_, _) =>
+        {
+            SmoothScroll.Attach(SettingsScroll);
+            SmoothScroll.Attach(SideScroll);
+            if (FindVisualChild<ScrollViewer>(ClipList) is { } listScroll)
+                SmoothScroll.Attach(listScroll);
+        };
 
         _updateTimer = new DispatcherTimer { Interval = TimeSpan.FromHours(4) };
         _updateTimer.Tick += (_, _) => _ = CheckUpdatesAsync(manual: false);
@@ -313,15 +325,23 @@ public partial class MainWindow : Window
 
     private void SelectNav(string filter)
     {
+        var previous = _filter;
         _filter = filter;
         foreach (var (key, button) in _nav)
             button.Tag = key == filter ? "active" : key;
-        ApplyFilter((ClipList.SelectedItem as ClipItem)?.Id);
         if (FolderList.ItemsSource is IEnumerable<CollectionItem> folders)
         {
             foreach (var folder in folders)
                 folder.IsSelected = false;
         }
+
+        if (!_navReady || previous == filter)
+        {
+            ApplyFilter((ClipList.SelectedItem as ClipItem)?.Id);
+            return;
+        }
+
+        PlaySection(NavIndex(filter).CompareTo(NavIndex(previous)), () => ApplyFilter(null));
     }
 
     private void OnNavClick(object sender, RoutedEventArgs e)
@@ -340,14 +360,22 @@ public partial class MainWindow : Window
         {
             foreach (var (key, button) in _nav)
                 button.Tag = key;
-            _filter = $"collection:{folder.Id}";
+            var previous = _filter;
+            var next = $"collection:{folder.Id}";
+            _filter = next;
             if (FolderList.ItemsSource is IEnumerable<CollectionItem> folders)
             {
                 foreach (var item in folders)
                     item.IsSelected = item.Id == folder.Id;
             }
 
-            ApplyFilter(null);
+            if (!_navReady || previous == next)
+            {
+                ApplyFilter(null);
+                return;
+            }
+
+            PlaySection(NavIndex(next).CompareTo(NavIndex(previous)), () => ApplyFilter(null));
         }
     }
 
@@ -1034,6 +1062,68 @@ public partial class MainWindow : Window
                 ? "M7,7 H15 V15 H7 Z M5,9 V17 H13"
                 : "M5,5 H15 V15 H5 Z");
         ApplyWindowShape();
+    }
+
+    private int NavIndex(string filter)
+    {
+        var i = Array.IndexOf(NavOrder, filter);
+        if (i >= 0)
+            return i;
+        if (filter.StartsWith("collection:", StringComparison.Ordinal) &&
+            FolderList.ItemsSource is IEnumerable<CollectionItem> folders)
+        {
+            var id = filter["collection:".Length..];
+            var index = 0;
+            foreach (var folder in folders)
+            {
+                if (folder.Id.ToString(CultureInfo.InvariantCulture) == id)
+                    return NavOrder.Length + index;
+                index++;
+            }
+            return NavOrder.Length;
+        }
+        return 0;
+    }
+
+    private void PlaySection(int direction, Action swap)
+    {
+        if (direction == 0)
+            direction = 1;
+        swap();
+        if (ClipPane is null)
+            return;
+
+        var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
+        var slide = new TranslateTransform(22 * direction, 12);
+        var scale = new ScaleTransform(0.982, 0.982);
+        var group = new TransformGroup();
+        group.Children.Add(scale);
+        group.Children.Add(slide);
+        ClipPane.RenderTransformOrigin = new Point(0.5, 0.08);
+        ClipPane.RenderTransform = group;
+        ClipPane.Opacity = 0;
+
+        var time = TimeSpan.FromMilliseconds(320);
+        slide.BeginAnimation(TranslateTransform.XProperty, new DoubleAnimation(22 * direction, 0, time) { EasingFunction = ease });
+        slide.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(12, 0, time) { EasingFunction = ease });
+        scale.BeginAnimation(ScaleTransform.ScaleXProperty, new DoubleAnimation(0.982, 1, time) { EasingFunction = ease });
+        scale.BeginAnimation(ScaleTransform.ScaleYProperty, new DoubleAnimation(0.982, 1, time) { EasingFunction = ease });
+        ClipPane.BeginAnimation(UIElement.OpacityProperty, new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(260)) { EasingFunction = ease });
+    }
+
+    private static T? FindVisualChild<T>(DependencyObject? root) where T : DependencyObject
+    {
+        if (root is null)
+            return null;
+        if (root is T match)
+            return match;
+        for (var i = 0; i < VisualTreeHelper.GetChildrenCount(root); i++)
+        {
+            var found = FindVisualChild<T>(VisualTreeHelper.GetChild(root, i));
+            if (found is not null)
+                return found;
+        }
+        return null;
     }
 
     private static T? FindParent<T>(DependencyObject? start) where T : DependencyObject
