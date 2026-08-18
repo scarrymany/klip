@@ -84,6 +84,7 @@
         </Style>
 
         <Style x:Key="GhostButton" TargetType="Button">
+            <Setter Property="WindowChrome.IsHitTestVisibleInChrome" Value="True"/>
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="Foreground" Value="{StaticResource MutedBrush}"/>
             <Setter Property="BorderThickness" Value="0"/>
@@ -121,6 +122,7 @@
         </Style>
 
         <Style x:Key="PrimaryButton" TargetType="Button">
+            <Setter Property="WindowChrome.IsHitTestVisibleInChrome" Value="True"/>
             <Setter Property="Background" Value="{StaticResource AccentBrush}"/>
             <Setter Property="Foreground" Value="{StaticResource AccentFgBrush}"/>
             <Setter Property="BorderThickness" Value="0"/>
@@ -151,6 +153,7 @@
         </Style>
 
         <Style x:Key="NavButton" TargetType="Button">
+            <Setter Property="WindowChrome.IsHitTestVisibleInChrome" Value="True"/>
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="Foreground" Value="{StaticResource MutedBrush}"/>
             <Setter Property="BorderThickness" Value="0"/>
@@ -191,6 +194,7 @@
         </Style>
 
         <Style x:Key="FieldBox" TargetType="TextBox">
+            <Setter Property="WindowChrome.IsHitTestVisibleInChrome" Value="True"/>
             <Setter Property="Background" Value="{StaticResource GlassBrush}"/>
             <Setter Property="Foreground" Value="{StaticResource FgBrush}"/>
             <Setter Property="CaretBrush" Value="{StaticResource AccentBrush}"/>
@@ -213,6 +217,7 @@
         </Style>
 
         <Style x:Key="GlassCheck" TargetType="CheckBox">
+            <Setter Property="WindowChrome.IsHitTestVisibleInChrome" Value="True"/>
             <Setter Property="Foreground" Value="{StaticResource MutedBrush}"/>
             <Setter Property="FontSize" Value="12"/>
             <Setter Property="Cursor" Value="Hand"/>
@@ -242,6 +247,7 @@
         </Style>
 
         <Style TargetType="ScrollBar">
+            <Setter Property="WindowChrome.IsHitTestVisibleInChrome" Value="True"/>
             <Setter Property="Width" Value="8"/>
             <Setter Property="MinWidth" Value="8"/>
             <Setter Property="Background" Value="Transparent"/>
@@ -273,6 +279,7 @@
         </Style>
 
         <Style TargetType="ScrollViewer">
+            <Setter Property="WindowChrome.IsHitTestVisibleInChrome" Value="True"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ScrollViewer">
@@ -284,6 +291,30 @@
                             <ScrollContentPresenter Grid.Column="0"/>
                             <ScrollBar x:Name="PART_VerticalScrollBar"
                                        Grid.Column="1"
+                                       Orientation="Vertical"
+                                       Maximum="{TemplateBinding ScrollableHeight}"
+                                       ViewportSize="{TemplateBinding ViewportHeight}"
+                                       Value="{TemplateBinding VerticalOffset}"
+                                       Visibility="{TemplateBinding ComputedVerticalScrollBarVisibility}"/>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="OverlayScroll" TargetType="ScrollViewer" BasedOn="{StaticResource {x:Type ScrollViewer}}">
+            <Setter Property="HorizontalScrollBarVisibility" Value="Disabled"/>
+            <Setter Property="VerticalScrollBarVisibility" Value="Auto"/>
+            <Setter Property="PanningMode" Value="VerticalOnly"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ScrollViewer">
+                        <Grid>
+                            <ScrollContentPresenter/>
+                            <ScrollBar x:Name="PART_VerticalScrollBar"
+                                       HorizontalAlignment="Right"
+                                       Width="3"
+                                       Margin="0,10,6,10"
                                        Orientation="Vertical"
                                        Maximum="{TemplateBinding ScrollableHeight}"
                                        ViewportSize="{TemplateBinding ViewportHeight}"
@@ -444,6 +475,7 @@
         </Style>
 
         <Style x:Key="ColorSwatch" TargetType="Button">
+            <Setter Property="WindowChrome.IsHitTestVisibleInChrome" Value="True"/>
             <Setter Property="Width" Value="22"/>
             <Setter Property="Height" Value="22"/>
             <Setter Property="Cursor" Value="Hand"/>
@@ -466,6 +498,7 @@
         </Style>
 
         <Style x:Key="GlassSlider" TargetType="Slider">
+            <Setter Property="WindowChrome.IsHitTestVisibleInChrome" Value="True"/>
             <Setter Property="Minimum" Value="0"/>
             <Setter Property="Maximum" Value="40"/>
             <Setter Property="Height" Value="22"/>
@@ -500,6 +533,7 @@
         </Style>
 
         <Style x:Key="ChipToggle" TargetType="ToggleButton">
+            <Setter Property="WindowChrome.IsHitTestVisibleInChrome" Value="True"/>
             <Setter Property="Background" Value="{StaticResource GlassBrush}"/>
             <Setter Property="Foreground" Value="{StaticResource MutedBrush}"/>
             <Setter Property="BorderThickness" Value="0"/>

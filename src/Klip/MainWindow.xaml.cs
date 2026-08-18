@@ -39,6 +39,8 @@ public partial class MainWindow : Window
     private string _editorColor = ClipColors.None;
     private string? _wallpaperLoaded;
     private bool _appearanceReady;
+    private bool _overlayClosing;
+    private DispatcherTimer? _overlayHide;
 
     public ObservableCollection<ClipItem> VisibleClips => _visible;
 
@@ -215,7 +217,7 @@ public partial class MainWindow : Window
             return;
         if (_pendingUpdate is { } info)
             _updates.Dismiss(info.Version);
-        UpdateCard.Visibility = Visibility.Collapsed;
+        PlayFade(UpdateCard, show: false, () => UpdateCard.Visibility = Visibility.Collapsed);
     }
 
     private async void OnUpdateApply(object sender, RoutedEventArgs e)
@@ -437,13 +439,13 @@ public partial class MainWindow : Window
         _editorColor = item?.Color ?? ClipColors.None;
         UpdateKindChips();
         RebuildEditorFolders(item?.CollectionId);
-        EditorOverlay.Visibility = Visibility.Visible;
+        PlayOverlay(EditorOverlay, EditorCard, show: true);
         EditorBody.Focus();
     }
 
     private void OnEditorCancel(object sender, RoutedEventArgs e)
     {
-        EditorOverlay.Visibility = Visibility.Collapsed;
+        PlayOverlay(EditorOverlay, EditorCard, show: false);
         _editing = null;
     }
 
@@ -480,7 +482,7 @@ public partial class MainWindow : Window
                 _store.Update(_editing);
             }
 
-            EditorOverlay.Visibility = Visibility.Collapsed;
+            PlayOverlay(EditorOverlay, EditorCard, show: false);
             _editing = null;
             Reload();
             Notify("Сохранено");
@@ -673,12 +675,9 @@ public partial class MainWindow : Window
         if (e.Key == Key.Escape)
         {
             if (SettingsOverlay.Visibility == Visibility.Visible)
-            {
-                SettingsOverlay.Visibility = Visibility.Collapsed;
-                SettingsButton.Tag = null;
-            }
+                CloseSettings();
             else if (EditorOverlay.Visibility == Visibility.Visible)
-                EditorOverlay.Visibility = Visibility.Collapsed;
+                PlayOverlay(EditorOverlay, EditorCard, show: false);
             else
                 HideToTray();
             e.Handled = true;
@@ -703,14 +702,84 @@ public partial class MainWindow : Window
     private void OnOpenSettings(object sender, RoutedEventArgs e)
     {
         SyncSettingsControls();
-        SettingsOverlay.Visibility = Visibility.Visible;
         SettingsButton.Tag = "active";
+        PlayOverlay(SettingsOverlay, SettingsCard, show: true);
     }
 
-    private void OnCloseSettings(object sender, RoutedEventArgs e)
+    private void OnCloseSettings(object sender, RoutedEventArgs e) => CloseSettings();
+
+    private void CloseSettings()
     {
-        SettingsOverlay.Visibility = Visibility.Collapsed;
         SettingsButton.Tag = null;
+        PlayOverlay(SettingsOverlay, SettingsCard, show: false);
+    }
+
+    private void PlayOverlay(Grid overlay, FrameworkElement card, bool show)
+    {
+        if (show)
+        {
+            _overlayClosing = false;
+            _overlayHide?.Stop();
+            overlay.Visibility = Visibility.Visible;
+        }
+        else if (_overlayClosing || overlay.Visibility != Visibility.Visible)
+        {
+            return;
+        }
+        else
+        {
+            _overlayClosing = true;
+        }
+
+        card.RenderTransformOrigin = new Point(0.5, 0.42);
+        var scale = new ScaleTransform(show ? 0.96 : 1, show ? 0.96 : 1);
+        var slide = new TranslateTransform(0, show ? 14 : 0);
+        var group = new TransformGroup();
+        group.Children.Add(scale);
+        group.Children.Add(slide);
+        card.RenderTransform = group;
+
+        var ease = new CubicEase { EasingMode = show ? EasingMode.EaseOut : EasingMode.EaseIn };
+        var duration = TimeSpan.FromMilliseconds(show ? 240 : 150);
+
+        overlay.BeginAnimation(OpacityProperty, new DoubleAnimation(show ? 0 : 1, show ? 1 : 0, duration)
+        {
+            EasingFunction = ease,
+            FillBehavior = FillBehavior.HoldEnd,
+        });
+        scale.BeginAnimation(ScaleTransform.ScaleXProperty, new DoubleAnimation(show ? 0.96 : 1, show ? 1 : 0.98, duration) { EasingFunction = ease });
+        scale.BeginAnimation(ScaleTransform.ScaleYProperty, new DoubleAnimation(show ? 0.96 : 1, show ? 1 : 0.98, duration) { EasingFunction = ease });
+        slide.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(show ? 14 : 0, show ? 0 : 10, duration) { EasingFunction = ease });
+
+        if (show)
+            return;
+
+        _overlayHide?.Stop();
+        _overlayHide = new DispatcherTimer { Interval = duration };
+        _overlayHide.Tick += (_, _) =>
+        {
+            _overlayHide.Stop();
+            overlay.BeginAnimation(OpacityProperty, null);
+            overlay.Opacity = 1;
+            overlay.Visibility = Visibility.Collapsed;
+            _overlayClosing = false;
+        };
+        _overlayHide.Start();
+    }
+
+    private static void PlayFade(UIElement element, bool show, Action? done = null)
+    {
+        element.Visibility = Visibility.Visible;
+        var anim = new DoubleAnimation(show ? 0 : 1, show ? 1 : 0, TimeSpan.FromMilliseconds(160))
+        {
+            EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut },
+        };
+        if (done is not null)
+        {
+            anim.Completed += (_, _) => done();
+        }
+
+        element.BeginAnimation(UIElement.OpacityProperty, anim);
     }
 
     private void OnThemeChanged(object sender, RoutedEventArgs e)

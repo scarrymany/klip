@@ -432,14 +432,16 @@
         </Border>
 
         <!-- Editor overlay -->
-        <Grid x:Name="EditorOverlay" Visibility="Collapsed" Background="#990B0D11">
-            <Border Width="560" MaxWidth="560"
+        <Grid x:Name="EditorOverlay" Visibility="Collapsed" Background="#990B0D11"
+              WindowChrome.IsHitTestVisibleInChrome="True">
+            <Border x:Name="EditorCard" Width="560" MaxWidth="560"
                     VerticalAlignment="Center" HorizontalAlignment="Center"
                     Background="#E613161C"
                     BorderBrush="{StaticResource HairlineStrongBrush}"
                     BorderThickness="1"
                     CornerRadius="20"
-                    Padding="22">
+                    Padding="22"
+                    RenderTransformOrigin="0.5,0.42">
                 <StackPanel>
                     <TextBlock x:Name="EditorTitle" Text="Новая запись" FontSize="18" FontWeight="SemiBold"/>
                     <TextBlock Text="Заголовок необязателен. Текст копируется целиком."
@@ -533,29 +535,39 @@
             </Border>
         </Grid>
 
-        <Grid x:Name="SettingsOverlay" Visibility="Collapsed" Background="#990B0D11">
-            <Border Width="440" MaxHeight="620"
+        <Grid x:Name="SettingsOverlay"
+              Visibility="Collapsed"
+              Background="#990B0D11"
+              WindowChrome.IsHitTestVisibleInChrome="True">
+            <Border x:Name="SettingsCard"
+                    Width="460" MaxHeight="620"
                     VerticalAlignment="Center" HorizontalAlignment="Center"
                     Background="#F016191F"
                     BorderBrush="{StaticResource HairlineStrongBrush}"
                     BorderThickness="1"
                     CornerRadius="20"
-                    Padding="22,18">
-                <DockPanel>
-                    <Grid DockPanel.Dock="Top" Margin="0,0,0,12">
-                        <TextBlock Text="Настройки" FontSize="18" FontWeight="SemiBold"/>
+                    ClipToBounds="True"
+                    RenderTransformOrigin="0.5,0.42">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <Grid Margin="22,18,12,8">
+                        <TextBlock Text="Настройки" FontSize="18" FontWeight="SemiBold" VerticalAlignment="Center"/>
                         <Button Style="{StaticResource IconButton}"
                                 HorizontalAlignment="Right"
-                                Width="32" Height="32"
+                                Width="36" Height="36"
                                 Click="OnCloseSettings"
-                                ToolTip="Закрыть">
+                                ToolTip="Закрыть"
+                                WindowChrome.IsHitTestVisibleInChrome="True">
                             <Path Width="9" Height="9" Stretch="Uniform"
                                   Stroke="{StaticResource MutedBrush}" StrokeThickness="1.6"
                                   Data="M1,1 L11,11 M11,1 L1,11"/>
                         </Button>
                     </Grid>
-                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                        <StackPanel>
+                    <ScrollViewer Grid.Row="1" Style="{StaticResource OverlayScroll}">
+                        <StackPanel Margin="22,4,22,20">
                             <TextBlock Text="Окно" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource SubtleBrush}"/>
                             <CheckBox x:Name="SettingsAcrylic"
                                       Style="{StaticResource GlassCheck}"
@@ -640,7 +652,7 @@
                                     Content="Сбросить оформление"/>
                         </StackPanel>
                     </ScrollViewer>
-                </DockPanel>
+                </Grid>
             </Border>
         </Grid>
 
