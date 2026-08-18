@@ -6,6 +6,12 @@ using System.Windows.Media;
 
 namespace Klip.Models;
 
+public static class ClipSources
+{
+    public const string Clipboard = "clipboard";
+    public const string Manual = "manual";
+}
+
 public static class ClipKinds
 {
     public const string Clip = "clip";
@@ -15,21 +21,28 @@ public static class ClipKinds
 
     public static readonly string[] All = [Clip, Note, Code, Link];
 
+    private static readonly Regex LinkRegex = new(
+        @"^https?://\S+$",
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled,
+        TimeSpan.FromMilliseconds(200));
+
+    private static readonly Regex CodeRegex = new(
+        @"[{};=<>]|function |const |let |class |def |import |#include |fn |pub ",
+        RegexOptions.CultureInvariant | RegexOptions.Compiled,
+        TimeSpan.FromMilliseconds(200));
+
     public static string Detect(string content)
     {
         var text = content.Trim();
         if (text.Length == 0)
             return Clip;
 
-        if (Regex.IsMatch(text, @"^https?://\S+$", RegexOptions.IgnoreCase) && !text.Contains('\n'))
+        if (LinkRegex.IsMatch(text) && !text.Contains('\n'))
             return Link;
 
         var lines = text.Split('\n');
-        if (lines.Length >= 4 &&
-            Regex.IsMatch(text, @"[{};=<>]|function |const |let |class |def |import |#include |fn |pub "))
-        {
+        if (lines.Length >= 4 && CodeRegex.IsMatch(text))
             return Code;
-        }
 
         if (text.Length > 320 || lines.Length >= 6)
             return Note;
@@ -187,6 +200,10 @@ public sealed class ClipItem : INotifyPropertyChanged
 
     public DateTime CreatedAt { get; set; }
 
+    public string Source { get; set; } = ClipSources.Clipboard;
+
+    public bool HasFullContent { get; set; } = true;
+
     public DateTime UpdatedAt
     {
         get => _updatedAt;
@@ -226,9 +243,14 @@ public sealed class ClipItem : INotifyPropertyChanged
         }
     }
 
+    private static readonly Regex Whitespace = new(
+        @"\s+",
+        RegexOptions.CultureInvariant | RegexOptions.Compiled,
+        TimeSpan.FromMilliseconds(200));
+
     public static string PreviewText(string content, int max)
     {
-        var compact = Regex.Replace(content, @"\s+", " ").Trim();
+        var compact = Whitespace.Replace(content, " ").Trim();
         if (compact.Length <= max)
             return compact;
         return compact[..max].TrimEnd() + "…";

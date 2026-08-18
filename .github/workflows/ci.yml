@@ -27,3 +27,6 @@ jobs:
 
       - name: Сборка
         run: dotnet build Klip.sln -c Release --no-restore
+
+      - name: Тесты
+        run: dotnet test Klip.sln -c Release --no-build --verbosity minimal

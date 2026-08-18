@@ -97,19 +97,24 @@ public partial class App : System.Windows.Application
 
     private void OnClipboardText(object? sender, string text)
     {
-        Dispatcher.Invoke(() =>
+        void Apply()
         {
             try
             {
                 var added = _store?.TryAddFromClipboard(text);
                 if (added is not null)
-                    _window?.Reload(keepSelection: false);
+                    _window?.AddCaptured(added);
             }
             catch (Exception ex)
             {
                 _window?.Notify(ex.Message);
             }
-        });
+        }
+
+        if (Dispatcher.CheckAccess())
+            Apply();
+        else
+            Dispatcher.BeginInvoke(Apply);
     }
 
     private IntPtr SingleInstanceHook(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
@@ -172,8 +177,20 @@ public partial class App : System.Windows.Application
             return;
         }
 
-        if (width < _window.MinWidth || height < _window.MinHeight)
+        if (!WindowPlacement.TryNormalize(
+                ref left,
+                ref top,
+                ref width,
+                ref height,
+                _window.MinWidth,
+                _window.MinHeight,
+                SystemParameters.VirtualScreenLeft,
+                SystemParameters.VirtualScreenTop,
+                SystemParameters.VirtualScreenWidth,
+                SystemParameters.VirtualScreenHeight))
+        {
             return;
+        }
 
         _window.WindowStartupLocation = WindowStartupLocation.Manual;
         _window.Left = left;

@@ -34,28 +34,7 @@ public sealed class UpdateService
 
     public UpdateService(ClipStore store) => _store = store;
 
-    public static bool IsPortableInstall()
-    {
-        var path = Environment.ProcessPath;
-        if (string.IsNullOrEmpty(path))
-            return true;
-
-        var dir = Path.GetDirectoryName(path) ?? "";
-        foreach (var root in new[]
-                 {
-                     Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
-                     Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86),
-                 })
-        {
-            if (!string.IsNullOrEmpty(root) &&
-                dir.StartsWith(root, StringComparison.OrdinalIgnoreCase))
-            {
-                return false;
-            }
-        }
-
-        return true;
-    }
+    public static bool IsPortableInstall() => InstallLayout.IsPortableInstall();
 
     public bool WasDismissed(Version version)
         => string.Equals(_store.GetSetting("update.dismissed"), version.ToString(), StringComparison.Ordinal);
@@ -140,7 +119,12 @@ public sealed class UpdateService
         var expected = await ReadExpectedHashAsync(checksumsUrl, assetName, cancellationToken).ConfigureAwait(false);
         await DownloadAsync(url, dest, progress, cancellationToken).ConfigureAwait(false);
 
-        var actual = Convert.ToHexString(SHA256.HashData(await File.ReadAllBytesAsync(dest, cancellationToken).ConfigureAwait(false)));
+        string actual;
+        await using (var file = new FileStream(dest, FileMode.Open, FileAccess.Read, FileShare.Read, 81920, true))
+        {
+            actual = Convert.ToHexString(await SHA256.HashDataAsync(file, cancellationToken).ConfigureAwait(false));
+        }
+
         if (!actual.Equals(expected, StringComparison.OrdinalIgnoreCase))
         {
             try { File.Delete(dest); } catch { /* temp file */ }
@@ -151,23 +135,7 @@ public sealed class UpdateService
     private static async Task<string> ReadExpectedHashAsync(string checksumsUrl, string assetName, CancellationToken cancellationToken)
     {
         var text = await Http.GetStringAsync(checksumsUrl, cancellationToken).ConfigureAwait(false);
-        foreach (var raw in text.Split('\n'))
-        {
-            var line = raw.Trim().TrimStart('\uFEFF');
-            if (line.Length == 0)
-                continue;
-
-            var space = line.IndexOfAny([' ', '\t']);
-            if (space <= 0)
-                continue;
-
-            var hash = line[..space].Trim();
-            var name = line[space..].Trim().TrimStart('*');
-            if (name.Equals(assetName, StringComparison.OrdinalIgnoreCase) && hash.Length >= 32)
-                return hash;
-        }
-
-        throw new InvalidOperationException("В SHA256SUMS.txt нет этого файла.");
+        return ChecksumFile.RequireHash(text, assetName);
     }
 
     private static async Task DownloadAsync(string url, string dest, IProgress<double>? progress, CancellationToken cancellationToken)

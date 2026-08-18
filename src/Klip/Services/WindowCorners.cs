@@ -17,9 +17,7 @@ public static class WindowCorners
             return;
 
         NativeMethods.SetWindowRgn(hwnd, IntPtr.Zero, true);
-        var corner = window.WindowState == WindowState.Maximized
-            ? NativeMethods.DWMWCP_DONOTROUND
-            : NativeMethods.DWMWCP_DONOTROUND;
+        var corner = NativeMethods.DWMWCP_DONOTROUND;
         NativeMethods.DwmSetWindowAttribute(
             hwnd, NativeMethods.DWMWA_WINDOW_CORNER_PREFERENCE, ref corner, sizeof(int));
     }

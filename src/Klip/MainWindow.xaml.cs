@@ -42,6 +42,8 @@ public partial class MainWindow : Window
     private bool _overlayClosing;
     private bool _navReady;
     private DispatcherTimer? _overlayHide;
+    private readonly DispatcherTimer _themeSaveTimer;
+    private readonly DispatcherTimer _themeApplyTimer;
 
     private static readonly string[] NavOrder = ["all", "pinned", "clip", "note", "code", "link"];
 
@@ -103,6 +105,20 @@ public partial class MainWindow : Window
                 SmoothScroll.Attach(listScroll);
         };
 
+        _themeSaveTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(280) };
+        _themeSaveTimer.Tick += (_, _) =>
+        {
+            _themeSaveTimer.Stop();
+            _theme.Save(_store);
+        };
+        _themeApplyTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(50) };
+        _themeApplyTimer.Tick += (_, _) =>
+        {
+            _themeApplyTimer.Stop();
+            if (_appearanceReady)
+                ApplyTheme();
+        };
+
         _updateTimer = new DispatcherTimer { Interval = TimeSpan.FromHours(4) };
         _updateTimer.Tick += (_, _) => _ = CheckUpdatesAsync(manual: false);
         _updateTimer.Start();
@@ -141,6 +157,68 @@ public partial class MainWindow : Window
         RebuildFolderMenu();
     }
 
+    public void AddCaptured(ClipItem item)
+    {
+        var existing = _all.FindIndex(c => c.Id == item.Id);
+        if (existing >= 0)
+            _all.RemoveAt(existing);
+        _all.Add(item);
+        _all.Sort(CompareClips);
+        DropTrimmedCaptures();
+
+        CountAll.Text = _all.Count.ToString(CultureInfo.InvariantCulture);
+        CountPinned.Text = _all.Count(c => c.Pinned).ToString(CultureInfo.InvariantCulture);
+        CountClip.Text = _all.Count(c => c.Kind == ClipKinds.Clip).ToString(CultureInfo.InvariantCulture);
+        CountNote.Text = _all.Count(c => c.Kind == ClipKinds.Note).ToString(CultureInfo.InvariantCulture);
+        CountCode.Text = _all.Count(c => c.Kind == ClipKinds.Code).ToString(CultureInfo.InvariantCulture);
+        CountLink.Text = _all.Count(c => c.Kind == ClipKinds.Link).ToString(CultureInfo.InvariantCulture);
+        TitleCount.Text = FormatRecords(_all.Count);
+        ApplyFilter(item.Id);
+    }
+
+    private void DropTrimmedCaptures()
+    {
+        if (_all.Count <= ClipStore.HistoryLimit)
+            return;
+
+        var extra = _all.Count - ClipStore.HistoryLimit;
+        var victims = _all
+            .Where(c => !c.Pinned && c.Source == ClipSources.Clipboard)
+            .OrderBy(c => c.UpdatedAt)
+            .ThenBy(c => c.Id)
+            .Take(extra)
+            .Select(c => c.Id)
+            .ToHashSet();
+        if (victims.Count == 0)
+            return;
+        _all.RemoveAll(c => victims.Contains(c.Id));
+    }
+
+    private static int CompareClips(ClipItem a, ClipItem b)
+    {
+        var pin = b.Pinned.CompareTo(a.Pinned);
+        if (pin != 0)
+            return pin;
+        var updated = b.UpdatedAt.CompareTo(a.UpdatedAt);
+        if (updated != 0)
+            return updated;
+        return b.Id.CompareTo(a.Id);
+    }
+
+    private ClipItem Hydrate(ClipItem item)
+    {
+        if (item.HasFullContent)
+            return item;
+
+        var full = _store.GetById(item.Id);
+        if (full is null)
+            return item;
+
+        item.Content = full.Content;
+        item.HasFullContent = true;
+        return item;
+    }
+
     public void Notify(string text)
     {
         ToastText.Text = text;
@@ -165,6 +243,7 @@ public partial class MainWindow : Window
 
     public void ForceClose()
     {
+        FlushTheme();
         _updateCts?.Cancel();
         _forceClose = true;
         Close();
@@ -292,7 +371,9 @@ public partial class MainWindow : Window
         var q = SearchBox.Text.Trim();
         if (q.Length > 0)
         {
+            var matches = _store.SearchIds(q).ToHashSet();
             query = query.Where(c =>
+                matches.Contains(c.Id) ||
                 c.Content.Contains(q, StringComparison.CurrentCultureIgnoreCase) ||
                 (c.Title?.Contains(q, StringComparison.CurrentCultureIgnoreCase) ?? false));
         }
@@ -405,6 +486,7 @@ public partial class MainWindow : Window
     {
         try
         {
+            item = Hydrate(item);
             _watcher.CopyText(item.Content);
             _store.MarkCopied(item.Id);
             item.CopyCount++;
@@ -459,6 +541,8 @@ public partial class MainWindow : Window
 
     private void OpenEditor(ClipItem? item)
     {
+        if (item is not null)
+            item = Hydrate(item);
         _editing = item;
         EditorTitle.Text = item is null ? "Новая запись" : "Запись";
         EditorName.Text = item?.Title ?? "";
@@ -501,6 +585,7 @@ public partial class MainWindow : Window
             }
             else
             {
+                Hydrate(_editing);
                 _editing.Title = title;
                 _editing.Content = content;
                 _editing.Kind = kind;
@@ -826,7 +911,8 @@ public partial class MainWindow : Window
         _theme.Dim = SettingsDim.Value / 100.0;
         SettingsBlurValue.Text = ((int)_theme.Blur).ToString(CultureInfo.InvariantCulture);
         SettingsDimValue.Text = ((int)(_theme.Dim * 100)).ToString(CultureInfo.InvariantCulture) + "%";
-        PersistTheme();
+        ScheduleThemeApply();
+        PersistTheme(immediateSave: false);
     }
 
     private void OnAccentDot(object sender, RoutedEventArgs e)
@@ -927,11 +1013,37 @@ public partial class MainWindow : Window
         Notify("Оформление сброшено");
     }
 
-    private void PersistTheme()
+    private void PersistTheme(bool immediateSave = true)
     {
-        _theme.Save(_store);
         if (_appearanceReady)
             ApplyTheme();
+        if (immediateSave)
+        {
+            _themeSaveTimer.Stop();
+            _theme.Save(_store);
+            return;
+        }
+
+        ScheduleThemeSave();
+    }
+
+    private void ScheduleThemeApply()
+    {
+        _themeApplyTimer.Stop();
+        _themeApplyTimer.Start();
+    }
+
+    private void ScheduleThemeSave()
+    {
+        _themeSaveTimer.Stop();
+        _themeSaveTimer.Start();
+    }
+
+    private void FlushTheme()
+    {
+        _themeApplyTimer.Stop();
+        _themeSaveTimer.Stop();
+        _theme.Save(_store);
     }
 
     private void SyncSettingsControls()

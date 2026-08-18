@@ -13,9 +13,10 @@
 
 ## 2. Идеи, которые не ломают локальность
 
-Клип хранит текст только на машине пользователя и не ходит в сеть.
-Предложения, которые требуют облака, телеметрии или аккаунта, скорее всего
-не подойдут. Локальный поиск, метки, папки и удобство горячей клавиши - да.
+Клип хранит текст только на машине пользователя. В сеть он ходит лишь
+за обновлениями с GitHub Releases. Предложения с облаком, телеметрией
+или аккаунтом скорее всего не подойдут. Локальный поиск, метки, папки
+и удобство горячей клавиши - да.
 
 ## Работа с кодом
 
@@ -26,6 +27,7 @@ git clone https://github.com/scarrymany/klip.git
 cd klip
 dotnet restore Klip.sln
 dotnet build Klip.sln -c Release
+dotnet test Klip.sln -c Release --no-build
 dotnet publish src/Klip/Klip.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o dist/app
 ```
 
@@ -34,10 +36,10 @@ dotnet publish src/Klip/Klip.csproj -c Release -r win-x64 --self-contained true 
 | Файл | За что отвечает |
 |---|---|
 | `Services/ClipboardWatcher.cs` | `AddClipboardFormatListener`, чтение текста, пропуск своих копий |
-| `Services/ClipStore.cs` | SQLite, лимит 500, дедуп соседних одинаковых записей |
+| `Services/ClipStore.cs` | SQLite, лимит 500, миграции, дедуп и подъём старой карточки |
 | `Services/HotkeyService.cs` | `RegisterHotKey` Ctrl+Shift+V |
 | `Services/TrayService.cs` | Значок и меню «Показать / Выход» |
-| `Services/AcrylicHelper.cs` | Mica/Acrylic, тёмный режим, скругление, запасной фон Win10 |
+| `Services/AcrylicHelper.cs` | Layered-окно, тёмный режим, без DWM Mica |
 | `Services/StartupService.cs` | HKCU Run |
 | `MainWindow.xaml` | Окно, список, фильтры, редактор |
 

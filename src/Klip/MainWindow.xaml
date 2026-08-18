@@ -310,6 +310,10 @@
                             <Grid x:Name="ClipPane" RenderTransformOrigin="0.5,0.08">
                             <ListBox x:Name="ClipList"
                                      ItemsSource="{Binding VisibleClips}"
+                                     VirtualizingPanel.IsVirtualizing="True"
+                                     VirtualizingPanel.VirtualizationMode="Recycling"
+                                     VirtualizingPanel.ScrollUnit="Pixel"
+                                     ScrollViewer.CanContentScroll="True"
                                      MouseDoubleClick="OnClipDoubleClick"
                                      PreviewMouseLeftButtonUp="OnClipClick"
                                      KeyDown="OnListKeyDown">

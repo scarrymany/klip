@@ -10,6 +10,8 @@ public static class AcrylicHelper
     public static readonly Color SolidFallback = Color.FromRgb(0x0B, 0x0D, 0x11);
     public static readonly Brush SolidFallbackBrush = CreateSolid();
 
+    // Layered WPF window. DWM Mica/Acrylic stay off so rounded corners
+    // stay see-through instead of sitting on a white Win32 fill.
     public static bool Apply(Window window)
     {
         PrepareLayered(window);

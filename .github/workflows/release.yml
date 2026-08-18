@@ -121,14 +121,14 @@ jobs:
           draft: false
           prerelease: false
           body: |
-            ## Клип ${{ github.ref_name }}
+            ## Клип ${{ needs.build.outputs.version }}
 
             Личный буфер обмена и заметки для Windows 10/11.
 
             | Файл | Для чего |
             | --- | --- |
-            | `Klip-Setup-1.0.10.exe` | Установщик Inno Setup — ярлыки, русский мастер |
-            | `Klip-1.0.10-win-x64.msi` | MSI для тихой установки |
+            | `Klip-Setup-${{ needs.build.outputs.version }}.exe` | Установщик Inno Setup - ярлыки, русский мастер |
+            | `Klip-${{ needs.build.outputs.version }}-win-x64.msi` | MSI для тихой установки |
             | `Klip-Portable-win-x64.zip` | Без установки |
             | `SHA256SUMS.txt` | Контрольные суммы |
 

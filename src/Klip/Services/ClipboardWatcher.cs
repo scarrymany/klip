@@ -9,6 +9,7 @@ public sealed class ClipboardWatcher : IDisposable
 {
     private HwndSource? _source;
     private int _ignoreOwn;
+    private int _epoch;
 
     public event EventHandler<string>? TextCaptured;
 
@@ -64,40 +65,44 @@ public sealed class ClipboardWatcher : IDisposable
         if (Interlocked.Exchange(ref _ignoreOwn, 0) == 1)
             return IntPtr.Zero;
 
-        var text = TryReadText();
-        if (!string.IsNullOrWhiteSpace(text))
-            TextCaptured?.Invoke(this, text);
-
+        var epoch = Interlocked.Increment(ref _epoch);
+        _ = CaptureAsync(epoch);
         return IntPtr.Zero;
     }
 
-    private static string? TryReadText()
+    private async Task CaptureAsync(int epoch)
     {
         for (var attempt = 0; attempt < 6; attempt++)
         {
+            if (epoch != Volatile.Read(ref _epoch))
+                return;
+
             try
             {
                 if (!System.Windows.Clipboard.ContainsText())
-                    return null;
+                    return;
 
                 var text = System.Windows.Clipboard.GetText(TextDataFormat.UnicodeText);
-                return string.IsNullOrWhiteSpace(text) ? null : text;
+                if (epoch != Volatile.Read(ref _epoch))
+                    return;
+                if (!string.IsNullOrWhiteSpace(text))
+                    TextCaptured?.Invoke(this, text);
+                return;
             }
             catch (COMException)
             {
-                Thread.Sleep(40);
+                await Task.Delay(40).ConfigureAwait(true);
             }
             catch (Exception)
             {
-                return null;
+                return;
             }
         }
-
-        return null;
     }
 
     public void Dispose()
     {
+        Interlocked.Increment(ref _epoch);
         if (_source is null)
             return;
 

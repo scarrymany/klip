@@ -3,7 +3,7 @@
     <?define PublishDir = "$(sys.SOURCEFILEDIR)..\dist\app" ?>
   <?endif?>
   <?ifndef ProductVersion ?>
-    <?define ProductVersion = "1.0.10" ?>
+    <?define ProductVersion = "1.1.0" ?>
   <?endif?>
 
   <Package Name="Клип"
@@ -42,6 +42,11 @@
               Source="$(var.PublishDir)\Klip.exe"
               KeyPath="yes"
               Checksum="yes" />
+      </Component>
+      <Component Id="KlipMarker" Guid="A9C3E5F1-8D24-4B70-91E6-3F5A7C2D9048">
+        <File Id="KlipInstalledFile"
+              Source="$(sys.SOURCEFILEDIR)Klip.installed"
+              KeyPath="yes" />
       </Component>
     </ComponentGroup>
 

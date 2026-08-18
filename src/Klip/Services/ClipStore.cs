@@ -1,5 +1,7 @@
 using System.Globalization;
 using System.IO;
+using System.Security.Cryptography;
+using System.Text;
 using Klip.Models;
 using Microsoft.Data.Sqlite;
 
@@ -9,6 +11,8 @@ public sealed class ClipStore : IDisposable
 {
     public const int HistoryLimit = 500;
     public const int MaxContentLength = 1_000_000;
+    public const int ListPreviewLength = 500;
+    public const int SchemaVersion = 1;
 
     private readonly SqliteConnection _db;
     private readonly object _gate = new();
@@ -19,12 +23,19 @@ public sealed class ClipStore : IDisposable
 
     public static string DatabasePath => Path.Combine(DataDirectory, "klip.db");
 
-    public ClipStore()
+    public ClipStore() : this(DatabasePath)
     {
-        Directory.CreateDirectory(DataDirectory);
+    }
+
+    public ClipStore(string databasePath)
+    {
+        var directory = Path.GetDirectoryName(databasePath);
+        if (!string.IsNullOrEmpty(directory))
+            Directory.CreateDirectory(directory);
+
         _db = new SqliteConnection(new SqliteConnectionStringBuilder
         {
-            DataSource = DatabasePath,
+            DataSource = databasePath,
             ForeignKeys = true,
             Cache = SqliteCacheMode.Shared,
         }.ToString());
@@ -73,7 +84,53 @@ public sealed class ClipStore : IDisposable
             CREATE INDEX IF NOT EXISTS clips_collection_idx ON clips (collection_id);
             """;
         cmd.ExecuteNonQuery();
+        Migrate();
         SeedWelcome();
+    }
+
+    private void Migrate()
+    {
+        var version = ReadUserVersion();
+        if (version < 1)
+            MigrateTo1();
+    }
+
+    private void MigrateTo1()
+    {
+        if (!HasColumn("clips", "source"))
+            Execute("ALTER TABLE clips ADD COLUMN source TEXT NOT NULL DEFAULT 'clipboard'");
+        if (!HasColumn("clips", "content_hash"))
+            Execute("ALTER TABLE clips ADD COLUMN content_hash TEXT");
+
+        Execute(
+            """
+            UPDATE clips
+            SET source = 'manual'
+            WHERE source = 'clipboard'
+              AND (title IS NOT NULL OR kind = 'note')
+            """);
+
+        using (var select = _db.CreateCommand())
+        {
+            select.CommandText = "SELECT id, content FROM clips WHERE content_hash IS NULL OR content_hash = ''";
+            using var reader = select.ExecuteReader();
+            var pending = new List<(long Id, string Hash)>();
+            while (reader.Read())
+                pending.Add((reader.GetInt64(0), HashContent(reader.GetString(1))));
+
+            foreach (var (id, hash) in pending)
+            {
+                using var update = _db.CreateCommand();
+                update.CommandText = "UPDATE clips SET content_hash = $hash WHERE id = $id";
+                update.Parameters.AddWithValue("$hash", hash);
+                update.Parameters.AddWithValue("$id", id);
+                update.ExecuteNonQuery();
+            }
+        }
+
+        Execute("CREATE INDEX IF NOT EXISTS clips_hash_idx ON clips (content_hash)");
+        Execute("CREATE INDEX IF NOT EXISTS clips_source_idx ON clips (source)");
+        SetUserVersion(1);
     }
 
     private void SeedWelcome()
@@ -84,21 +141,24 @@ public sealed class ClipStore : IDisposable
         if (count > 0)
             return;
 
-        using var insert = _db.CreateCommand();
-        insert.CommandText =
-            """
-            INSERT INTO clips (title, content, kind, color, pinned, copy_count, created_at, updated_at)
-            VALUES ($title, $content, $kind, 'none', 1, 0, $now, $now);
-            """;
-        insert.Parameters.AddWithValue("$title", "Добро пожаловать в Клип");
-        insert.Parameters.AddWithValue(
-            "$content",
+        var now = DateTime.UtcNow;
+        var content =
             "Клип следит за буфером обмена и сохраняет текст локально.\n\n" +
             "Ctrl+Shift+V показывает и скрывает окно.\n" +
             "Нажмите на запись, чтобы скопировать её обратно.\n" +
-            "Закреплённые фрагменты не вытесняются из истории.");
+            "Закреплённые фрагменты не вытесняются из истории.";
+        using var insert = _db.CreateCommand();
+        insert.CommandText =
+            """
+            INSERT INTO clips (title, content, kind, color, pinned, copy_count, created_at, updated_at, source, content_hash)
+            VALUES ($title, $content, $kind, 'none', 1, 0, $now, $now, $source, $hash);
+            """;
+        insert.Parameters.AddWithValue("$title", "Добро пожаловать в Клип");
+        insert.Parameters.AddWithValue("$content", content);
         insert.Parameters.AddWithValue("$kind", ClipKinds.Note);
-        insert.Parameters.AddWithValue("$now", Format(DateTime.UtcNow));
+        insert.Parameters.AddWithValue("$now", Format(now));
+        insert.Parameters.AddWithValue("$source", ClipSources.Manual);
+        insert.Parameters.AddWithValue("$hash", HashContent(content));
         insert.ExecuteNonQuery();
     }
 
@@ -109,12 +169,45 @@ public sealed class ClipStore : IDisposable
             using var cmd = _db.CreateCommand();
             cmd.CommandText =
                 """
-                SELECT id, collection_id, title, content, kind, color, pinned,
-                       copy_count, last_copied_at, created_at, updated_at
+                SELECT id, collection_id, title,
+                       CASE WHEN length(content) > $preview THEN substr(content, 1, $preview) ELSE content END,
+                       kind, color, pinned, copy_count, last_copied_at, created_at, updated_at,
+                       length(content), source
                 FROM clips
                 ORDER BY pinned DESC, updated_at DESC, id DESC
                 """;
-            return ReadClips(cmd);
+            cmd.Parameters.AddWithValue("$preview", ListPreviewLength);
+            return ReadClips(cmd, includeLength: true);
+        }
+    }
+
+    public ClipItem? GetById(long id)
+    {
+        lock (_gate)
+            return GetByIdUnlocked(id);
+    }
+
+    public IReadOnlyList<long> SearchIds(string query)
+    {
+        var needle = query.Trim();
+        if (needle.Length == 0)
+            return [];
+
+        lock (_gate)
+        {
+            using var cmd = _db.CreateCommand();
+            cmd.CommandText =
+                """
+                SELECT id FROM clips
+                WHERE IFNULL(title, '') LIKE $q ESCAPE '\'
+                   OR content LIKE $q ESCAPE '\'
+                """;
+            cmd.Parameters.AddWithValue("$q", "%" + EscapeLike(needle) + "%");
+            using var reader = cmd.ExecuteReader();
+            var ids = new List<long>();
+            while (reader.Read())
+                ids.Add(reader.GetInt64(0));
+            return ids;
         }
     }
 
@@ -153,27 +246,41 @@ public sealed class ClipStore : IDisposable
         if (content.Length == 0)
             return null;
 
+        var hash = HashContent(content);
         lock (_gate)
         {
-            var latest = GetLatestUnlocked();
-            if (latest is not null && latest.Content == content)
+            if (IsSameAsLatestUnlocked(content, hash))
                 return null;
 
+            var existingId = FindIdByHashUnlocked(hash);
             var now = DateTime.UtcNow;
+            if (existingId is { } id)
+            {
+                using var bump = _db.CreateCommand();
+                bump.CommandText = "UPDATE clips SET updated_at = $now, content_hash = $hash WHERE id = $id";
+                bump.Parameters.AddWithValue("$now", Format(now));
+                bump.Parameters.AddWithValue("$hash", hash);
+                bump.Parameters.AddWithValue("$id", id);
+                bump.ExecuteNonQuery();
+                return GetByIdUnlocked(id);
+            }
+
             var kind = ClipKinds.Detect(content);
             using var cmd = _db.CreateCommand();
             cmd.CommandText =
                 """
-                INSERT INTO clips (content, kind, color, pinned, copy_count, created_at, updated_at)
-                VALUES ($content, $kind, 'none', 0, 0, $now, $now);
+                INSERT INTO clips (content, kind, color, pinned, copy_count, created_at, updated_at, source, content_hash)
+                VALUES ($content, $kind, 'none', 0, 0, $now, $now, $source, $hash);
                 SELECT last_insert_rowid();
                 """;
             cmd.Parameters.AddWithValue("$content", content);
             cmd.Parameters.AddWithValue("$kind", kind);
             cmd.Parameters.AddWithValue("$now", Format(now));
-            var id = (long)cmd.ExecuteScalar()!;
+            cmd.Parameters.AddWithValue("$source", ClipSources.Clipboard);
+            cmd.Parameters.AddWithValue("$hash", hash);
+            var inserted = (long)cmd.ExecuteScalar()!;
             TrimUnlocked();
-            return GetByIdUnlocked(id);
+            return GetByIdUnlocked(inserted);
         }
     }
 
@@ -192,8 +299,8 @@ public sealed class ClipStore : IDisposable
             using var cmd = _db.CreateCommand();
             cmd.CommandText =
                 """
-                INSERT INTO clips (collection_id, title, content, kind, color, pinned, copy_count, created_at, updated_at)
-                VALUES ($collection, $title, $content, $kind, $color, 0, 0, $now, $now);
+                INSERT INTO clips (collection_id, title, content, kind, color, pinned, copy_count, created_at, updated_at, source, content_hash)
+                VALUES ($collection, $title, $content, $kind, $color, 0, 0, $now, $now, $source, $hash);
                 SELECT last_insert_rowid();
                 """;
             cmd.Parameters.AddWithValue("$collection", collectionId is null ? DBNull.Value : collectionId.Value);
@@ -202,8 +309,9 @@ public sealed class ClipStore : IDisposable
             cmd.Parameters.AddWithValue("$kind", kind);
             cmd.Parameters.AddWithValue("$color", string.IsNullOrWhiteSpace(color) ? ClipColors.None : color);
             cmd.Parameters.AddWithValue("$now", Format(now));
+            cmd.Parameters.AddWithValue("$source", ClipSources.Manual);
+            cmd.Parameters.AddWithValue("$hash", HashContent(content));
             var id = (long)cmd.ExecuteScalar()!;
-            TrimUnlocked();
             return GetByIdUnlocked(id) ?? throw new InvalidOperationException("Не удалось сохранить запись.");
         }
     }
@@ -212,6 +320,7 @@ public sealed class ClipStore : IDisposable
     {
         lock (_gate)
         {
+            var content = Normalize(item.Content);
             using var cmd = _db.CreateCommand();
             cmd.CommandText =
                 """
@@ -224,18 +333,20 @@ public sealed class ClipStore : IDisposable
                     pinned = $pinned,
                     copy_count = $copies,
                     last_copied_at = $copied,
-                    updated_at = $updated
+                    updated_at = $updated,
+                    content_hash = $hash
                 WHERE id = $id
                 """;
             cmd.Parameters.AddWithValue("$collection", item.CollectionId is null ? DBNull.Value : item.CollectionId.Value);
             cmd.Parameters.AddWithValue("$title", string.IsNullOrWhiteSpace(item.Title) ? DBNull.Value : item.Title.Trim());
-            cmd.Parameters.AddWithValue("$content", Normalize(item.Content));
+            cmd.Parameters.AddWithValue("$content", content);
             cmd.Parameters.AddWithValue("$kind", item.Kind);
             cmd.Parameters.AddWithValue("$color", item.Color);
             cmd.Parameters.AddWithValue("$pinned", item.Pinned ? 1 : 0);
             cmd.Parameters.AddWithValue("$copies", item.CopyCount);
             cmd.Parameters.AddWithValue("$copied", item.LastCopiedAt is null ? DBNull.Value : Format(item.LastCopiedAt.Value));
             cmd.Parameters.AddWithValue("$updated", Format(item.UpdatedAt));
+            cmd.Parameters.AddWithValue("$hash", HashContent(content));
             cmd.Parameters.AddWithValue("$id", item.Id);
             cmd.ExecuteNonQuery();
         }
@@ -389,19 +500,58 @@ public sealed class ClipStore : IDisposable
         }
     }
 
-    private ClipItem? GetLatestUnlocked()
+    public static string HashContent(string content)
+    {
+        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(content));
+        return Convert.ToHexString(bytes).ToLowerInvariant();
+    }
+
+    public static string EscapeLike(string value)
+        => value.Replace("\\", "\\\\", StringComparison.Ordinal)
+            .Replace("%", "\\%", StringComparison.Ordinal)
+            .Replace("_", "\\_", StringComparison.Ordinal);
+
+    public static string Normalize(string content)
+    {
+        var text = content.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n');
+        if (text.Length > MaxContentLength)
+            text = text[..MaxContentLength];
+        return text;
+    }
+
+    private bool IsSameAsLatestUnlocked(string content, string hash)
     {
         using var cmd = _db.CreateCommand();
         cmd.CommandText =
             """
-            SELECT id, collection_id, title, content, kind, color, pinned,
-                   copy_count, last_copied_at, created_at, updated_at
+            SELECT content, content_hash
             FROM clips
             ORDER BY id DESC
             LIMIT 1
             """;
-        var list = ReadClips(cmd);
-        return list.Count == 0 ? null : list[0];
+        using var reader = cmd.ExecuteReader();
+        if (!reader.Read())
+            return false;
+
+        if (!reader.IsDBNull(1))
+        {
+            var latestHash = reader.GetString(1);
+            if (!string.IsNullOrEmpty(latestHash))
+                return string.Equals(latestHash, hash, StringComparison.Ordinal);
+        }
+
+        return reader.GetString(0) == content;
+    }
+
+    private long? FindIdByHashUnlocked(string hash)
+    {
+        using var cmd = _db.CreateCommand();
+        cmd.CommandText = "SELECT id FROM clips WHERE content_hash = $hash ORDER BY updated_at DESC, id DESC LIMIT 1";
+        cmd.Parameters.AddWithValue("$hash", hash);
+        var value = cmd.ExecuteScalar();
+        if (value is null or DBNull)
+            return null;
+        return Convert.ToInt64(value, CultureInfo.InvariantCulture);
     }
 
     private ClipItem? GetByIdUnlocked(long id)
@@ -410,12 +560,13 @@ public sealed class ClipStore : IDisposable
         cmd.CommandText =
             """
             SELECT id, collection_id, title, content, kind, color, pinned,
-                   copy_count, last_copied_at, created_at, updated_at
+                   copy_count, last_copied_at, created_at, updated_at,
+                   length(content), source
             FROM clips
             WHERE id = $id
             """;
         cmd.Parameters.AddWithValue("$id", id);
-        var list = ReadClips(cmd);
+        var list = ReadClips(cmd, includeLength: true, fullContent: true);
         return list.Count == 0 ? null : list[0];
     }
 
@@ -433,7 +584,7 @@ public sealed class ClipStore : IDisposable
             DELETE FROM clips
             WHERE id IN (
                 SELECT id FROM clips
-                WHERE pinned = 0
+                WHERE pinned = 0 AND source = 'clipboard'
                 ORDER BY updated_at ASC, id ASC
                 LIMIT $extra
             )
@@ -442,18 +593,21 @@ public sealed class ClipStore : IDisposable
         trim.ExecuteNonQuery();
     }
 
-    private static List<ClipItem> ReadClips(SqliteCommand cmd)
+    private static List<ClipItem> ReadClips(SqliteCommand cmd, bool includeLength, bool fullContent = false)
     {
         using var reader = cmd.ExecuteReader();
         var list = new List<ClipItem>();
         while (reader.Read())
         {
+            var content = reader.GetString(3);
+            var length = includeLength ? reader.GetInt32(11) : content.Length;
+            var source = includeLength && !reader.IsDBNull(12) ? reader.GetString(12) : ClipSources.Clipboard;
             list.Add(new ClipItem
             {
                 Id = reader.GetInt64(0),
                 CollectionId = reader.IsDBNull(1) ? null : reader.GetInt64(1),
                 Title = reader.IsDBNull(2) ? null : reader.GetString(2),
-                Content = reader.GetString(3),
+                Content = content,
                 Kind = reader.GetString(4),
                 Color = reader.GetString(5),
                 Pinned = reader.GetInt32(6) != 0,
@@ -461,18 +615,47 @@ public sealed class ClipStore : IDisposable
                 LastCopiedAt = reader.IsDBNull(8) ? null : Parse(reader.GetString(8)),
                 CreatedAt = Parse(reader.GetString(9)),
                 UpdatedAt = Parse(reader.GetString(10)),
+                Source = source,
+                HasFullContent = fullContent || length <= content.Length,
             });
         }
 
         return list;
     }
 
-    private static string Normalize(string content)
+    private int ReadUserVersion()
     {
-        var text = content.Replace("\r\n", "\n").Replace('\r', '\n');
-        if (text.Length > MaxContentLength)
-            text = text[..MaxContentLength];
-        return text;
+        using var cmd = _db.CreateCommand();
+        cmd.CommandText = "PRAGMA user_version";
+        return Convert.ToInt32(cmd.ExecuteScalar(), CultureInfo.InvariantCulture);
+    }
+
+    private void SetUserVersion(int version)
+    {
+        using var cmd = _db.CreateCommand();
+        cmd.CommandText = "PRAGMA user_version = " + version.ToString(CultureInfo.InvariantCulture);
+        cmd.ExecuteNonQuery();
+    }
+
+    private bool HasColumn(string table, string column)
+    {
+        using var cmd = _db.CreateCommand();
+        cmd.CommandText = "PRAGMA table_info(" + table + ")";
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read())
+        {
+            if (string.Equals(reader.GetString(1), column, StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+
+        return false;
+    }
+
+    private void Execute(string sql)
+    {
+        using var cmd = _db.CreateCommand();
+        cmd.CommandText = sql;
+        cmd.ExecuteNonQuery();
     }
 
     private static string Format(DateTime value)
