@@ -8,7 +8,7 @@
 
 [![Release](https://img.shields.io/github/v/release/scarrymany/klip?style=for-the-badge&color=d7dde6&labelColor=0b0d11)](https://github.com/scarrymany/klip/releases/latest)
 [![CI](https://img.shields.io/github/actions/workflow/status/scarrymany/klip/ci.yml?branch=main&style=for-the-badge&label=CI&labelColor=0b0d11)](https://github.com/scarrymany/klip/actions/workflows/ci.yml)
-[![Downloads](https://img.shields.io/github/downloads/scarrymany/klip/total?style=for-the-badge&color=7a9a86&labelColor=0b0d11)](https://github.com/scarrymany/klip/releases)
+[![Downloads](https://img.shields.io/github/downloads/scarrymany/klip/total.svg?style=for-the-badge&color=7a9a86&labelColor=0b0d11&cacheSeconds=3600)](https://github.com/scarrymany/klip/releases)
 [![License](https://img.shields.io/badge/license-MIT-8b929c?style=for-the-badge&labelColor=0b0d11)](LICENSE)
 [![Platform](https://img.shields.io/badge/Windows%2010%20%7C%2011-0b0d11?style=for-the-badge&logo=windows&logoColor=d7dde6)](#установка)
 [![.NET](https://img.shields.io/badge/.NET%209-0b0d11?style=for-the-badge&logo=dotnet&logoColor=d7dde6)](#сборка)
