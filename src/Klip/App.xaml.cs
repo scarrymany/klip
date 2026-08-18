@@ -21,8 +21,8 @@ public partial class App : System.Windows.Application
 
         _window = new MainWindow();
         _tray = new TrayService();
-        _tray.ShowClicked += () => _window.Reveal();
-        _tray.ExitClicked += ShutdownApp;
+        _tray.ShowRequested += (_, _) => _window.Reveal();
+        _tray.ExitRequested += (_, _) => ShutdownApp();
         _window.Show();
     }
 

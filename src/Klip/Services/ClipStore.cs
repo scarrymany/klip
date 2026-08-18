@@ -1,4 +1,4 @@
-using System.IO;
+using System.Globalization;
 using Klip.Models;
 using Microsoft.Data.Sqlite;
 
@@ -7,262 +7,487 @@ namespace Klip.Services;
 public sealed class ClipStore : IDisposable
 {
     public const int HistoryLimit = 500;
+    public const int MaxContentLength = 1_000_000;
+
     private readonly SqliteConnection _db;
+    private readonly object _gate = new();
+
+    public static string DataDirectory { get; } = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+        "Klip");
+
+    public static string DatabasePath => Path.Combine(DataDirectory, "klip.db");
 
     public ClipStore()
     {
-        var dir = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "Klip");
-        Directory.CreateDirectory(dir);
-        _db = new SqliteConnection($"Data Source={Path.Combine(dir, "klip.db")}");
+        Directory.CreateDirectory(DataDirectory);
+        _db = new SqliteConnection(new SqliteConnectionStringBuilder
+        {
+            DataSource = DatabasePath,
+            ForeignKeys = true,
+            Cache = SqliteCacheMode.Shared,
+        }.ToString());
         _db.Open();
+        Initialize();
+    }
+
+    private void Initialize()
+    {
         using var cmd = _db.CreateCommand();
-        cmd.CommandText = """
-            create table if not exists collections (
-              id integer primary key autoincrement,
-              name text not null,
-              created_at text not null
+        cmd.CommandText =
+            """
+            PRAGMA journal_mode=WAL;
+            PRAGMA synchronous=NORMAL;
+            PRAGMA temp_store=MEMORY;
+
+            CREATE TABLE IF NOT EXISTS collections (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                created_at TEXT NOT NULL
             );
-            create table if not exists clips (
-              id integer primary key autoincrement,
-              collection_id integer,
-              title text,
-              content text not null,
-              kind text not null default 'clip',
-              color text not null default 'none',
-              pinned integer not null default 0,
-              copy_count integer not null default 0,
-              created_at text not null,
-              updated_at text not null,
-              last_copied_at text
+
+            CREATE TABLE IF NOT EXISTS clips (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                collection_id INTEGER,
+                title TEXT,
+                content TEXT NOT NULL,
+                kind TEXT NOT NULL DEFAULT 'clip',
+                color TEXT NOT NULL DEFAULT 'none',
+                pinned INTEGER NOT NULL DEFAULT 0,
+                copy_count INTEGER NOT NULL DEFAULT 0,
+                last_copied_at TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                FOREIGN KEY (collection_id) REFERENCES collections(id) ON DELETE SET NULL
             );
-            create index if not exists clips_updated on clips(pinned desc, updated_at desc);
+
+            CREATE TABLE IF NOT EXISTS settings (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            );
+
+            CREATE INDEX IF NOT EXISTS clips_updated_idx ON clips (updated_at DESC);
+            CREATE INDEX IF NOT EXISTS clips_pinned_idx ON clips (pinned);
+            CREATE INDEX IF NOT EXISTS clips_kind_idx ON clips (kind);
+            CREATE INDEX IF NOT EXISTS clips_collection_idx ON clips (collection_id);
             """;
         cmd.ExecuteNonQuery();
+        SeedWelcome();
     }
 
-    public IReadOnlyList<ClipItem> List(string? query = null, string? kind = null, bool pinnedOnly = false, long? collectionId = null)
+    private void SeedWelcome()
     {
-        using var cmd = _db.CreateCommand();
-        var where = new List<string>();
-        if (pinnedOnly) where.Add("pinned = 1");
-        if (kind is not null)
+        using var check = _db.CreateCommand();
+        check.CommandText = "SELECT COUNT(*) FROM clips";
+        var count = Convert.ToInt32(check.ExecuteScalar(), CultureInfo.InvariantCulture);
+        if (count > 0)
+            return;
+
+        using var insert = _db.CreateCommand();
+        insert.CommandText =
+            """
+            INSERT INTO clips (title, content, kind, color, pinned, copy_count, created_at, updated_at)
+            VALUES ($title, $content, $kind, 'none', 1, 0, $now, $now);
+            """;
+        insert.Parameters.AddWithValue("$title", "Добро пожаловать в Клип");
+        insert.Parameters.AddWithValue(
+            "$content",
+            "Клип следит за буфером обмена и сохраняет текст локально.\n\n" +
+            "Ctrl+Shift+V показывает и скрывает окно.\n" +
+            "Нажмите на запись, чтобы скопировать её обратно.\n" +
+            "Закреплённые фрагменты не вытесняются из истории.");
+        insert.Parameters.AddWithValue("$kind", ClipKinds.Note);
+        insert.Parameters.AddWithValue("$now", Format(DateTime.UtcNow));
+        insert.ExecuteNonQuery();
+    }
+
+    public IReadOnlyList<ClipItem> ListClips()
+    {
+        lock (_gate)
         {
-            where.Add("kind = $kind");
-            cmd.Parameters.AddWithValue("$kind", kind);
+            using var cmd = _db.CreateCommand();
+            cmd.CommandText =
+                """
+                SELECT id, collection_id, title, content, kind, color, pinned,
+                       copy_count, last_copied_at, created_at, updated_at
+                FROM clips
+                ORDER BY pinned DESC, updated_at DESC, id DESC
+                """;
+            return ReadClips(cmd);
         }
-        if (collectionId is not null)
-        {
-            where.Add("collection_id = $cid");
-            cmd.Parameters.AddWithValue("$cid", collectionId.Value);
-        }
-        if (!string.IsNullOrWhiteSpace(query))
-        {
-            where.Add("(content like $q or ifnull(title,'') like $q)");
-            cmd.Parameters.AddWithValue("$q", "%" + query.Trim() + "%");
-        }
-
-        cmd.CommandText = $"""
-            select id, collection_id, title, content, kind, color, pinned, copy_count,
-                   created_at, updated_at, last_copied_at
-            from clips
-            {(where.Count > 0 ? "where " + string.Join(" and ", where) : "")}
-            order by pinned desc, updated_at desc
-            limit {HistoryLimit}
-            """;
-        return ReadClips(cmd);
-    }
-
-    public ClipItem Add(string content, string? title = null, string? kind = null, long? collectionId = null)
-    {
-        content = content.Replace("\0", "").TrimEnd();
-        if (string.IsNullOrWhiteSpace(content))
-            throw new InvalidOperationException("Пустой фрагмент");
-
-        using (var last = _db.CreateCommand())
-        {
-            last.CommandText = "select content from clips order by id desc limit 1";
-            var prev = last.ExecuteScalar() as string;
-            if (prev == content) return List().First();
-        }
-
-        var now = DateTime.UtcNow.ToString("o");
-        using var cmd = _db.CreateCommand();
-        cmd.CommandText = """
-            insert into clips (collection_id, title, content, kind, color, created_at, updated_at)
-            values ($cid, $title, $content, $kind, 'none', $now, $now);
-            select last_insert_rowid();
-            """;
-        cmd.Parameters.AddWithValue("$cid", (object?)collectionId ?? DBNull.Value);
-        cmd.Parameters.AddWithValue("$title", (object?)title ?? DBNull.Value);
-        cmd.Parameters.AddWithValue("$content", content);
-        cmd.Parameters.AddWithValue("$kind", kind ?? ClipItem.DetectKind(content));
-        cmd.Parameters.AddWithValue("$now", now);
-        var id = (long)(cmd.ExecuteScalar() ?? 0);
-        Trim();
-        return Get(id) ?? throw new InvalidOperationException("Не удалось сохранить");
-    }
-
-    public ClipItem? Get(long id)
-    {
-        using var cmd = _db.CreateCommand();
-        cmd.CommandText = """
-            select id, collection_id, title, content, kind, color, pinned, copy_count,
-                   created_at, updated_at, last_copied_at
-            from clips where id = $id
-            """;
-        cmd.Parameters.AddWithValue("$id", id);
-        return ReadClips(cmd).FirstOrDefault();
-    }
-
-    public void Update(ClipItem item)
-    {
-        using var cmd = _db.CreateCommand();
-        cmd.CommandText = """
-            update clips set
-              collection_id = $cid, title = $title, content = $content, kind = $kind,
-              color = $color, pinned = $pinned, updated_at = $now
-            where id = $id
-            """;
-        cmd.Parameters.AddWithValue("$cid", (object?)item.CollectionId ?? DBNull.Value);
-        cmd.Parameters.AddWithValue("$title", (object?)item.Title ?? DBNull.Value);
-        cmd.Parameters.AddWithValue("$content", item.Content);
-        cmd.Parameters.AddWithValue("$kind", item.Kind);
-        cmd.Parameters.AddWithValue("$color", item.Color);
-        cmd.Parameters.AddWithValue("$pinned", item.Pinned ? 1 : 0);
-        cmd.Parameters.AddWithValue("$now", DateTime.UtcNow.ToString("o"));
-        cmd.Parameters.AddWithValue("$id", item.Id);
-        cmd.ExecuteNonQuery();
-    }
-
-    public void Delete(long id)
-    {
-        using var cmd = _db.CreateCommand();
-        cmd.CommandText = "delete from clips where id = $id";
-        cmd.Parameters.AddWithValue("$id", id);
-        cmd.ExecuteNonQuery();
-    }
-
-    public void MarkCopied(long id)
-    {
-        using var cmd = _db.CreateCommand();
-        cmd.CommandText = """
-            update clips set copy_count = copy_count + 1, last_copied_at = $now
-            where id = $id
-            """;
-        cmd.Parameters.AddWithValue("$now", DateTime.UtcNow.ToString("o"));
-        cmd.Parameters.AddWithValue("$id", id);
-        cmd.ExecuteNonQuery();
     }
 
     public IReadOnlyList<CollectionItem> ListCollections()
     {
-        using var cmd = _db.CreateCommand();
-        cmd.CommandText = """
-            select c.id, c.name, c.created_at,
-                   (select count(*) from clips x where x.collection_id = c.id) as cnt
-            from collections c order by c.created_at
-            """;
-        var list = new List<CollectionItem>();
-        using var r = cmd.ExecuteReader();
-        while (r.Read())
+        lock (_gate)
         {
-            list.Add(new CollectionItem
+            using var cmd = _db.CreateCommand();
+            cmd.CommandText =
+                """
+                SELECT c.id, c.name, c.created_at,
+                       (SELECT COUNT(*) FROM clips x WHERE x.collection_id = c.id) AS cnt
+                FROM collections c
+                ORDER BY c.created_at ASC, c.id ASC
+                """;
+            using var reader = cmd.ExecuteReader();
+            var list = new List<CollectionItem>();
+            while (reader.Read())
             {
-                Id = r.GetInt64(0),
-                Name = r.GetString(1),
-                CreatedAt = DateTime.Parse(r.GetString(2)),
-                Count = r.GetInt32(3),
-            });
+                list.Add(new CollectionItem
+                {
+                    Id = reader.GetInt64(0),
+                    Name = reader.GetString(1),
+                    CreatedAt = Parse(reader.GetString(2)),
+                    Count = reader.GetInt32(3),
+                });
+            }
+
+            return list;
         }
-        return list;
+    }
+
+    public ClipItem? TryAddFromClipboard(string content)
+    {
+        content = Normalize(content);
+        if (content.Length == 0)
+            return null;
+
+        lock (_gate)
+        {
+            var latest = GetLatestUnlocked();
+            if (latest is not null && latest.Content == content)
+                return null;
+
+            var now = DateTime.UtcNow;
+            var kind = ClipKinds.Detect(content);
+            using var cmd = _db.CreateCommand();
+            cmd.CommandText =
+                """
+                INSERT INTO clips (content, kind, color, pinned, copy_count, created_at, updated_at)
+                VALUES ($content, $kind, 'none', 0, 0, $now, $now);
+                SELECT last_insert_rowid();
+                """;
+            cmd.Parameters.AddWithValue("$content", content);
+            cmd.Parameters.AddWithValue("$kind", kind);
+            cmd.Parameters.AddWithValue("$now", Format(now));
+            var id = (long)cmd.ExecuteScalar()!;
+            TrimUnlocked();
+            return GetByIdUnlocked(id);
+        }
+    }
+
+    public ClipItem AddNote(string? title, string content, string kind, string color, long? collectionId)
+    {
+        content = Normalize(content);
+        if (content.Length == 0)
+            throw new InvalidOperationException("Текст не может быть пустым.");
+
+        if (string.IsNullOrWhiteSpace(kind))
+            kind = ClipKinds.Detect(content);
+
+        lock (_gate)
+        {
+            var now = DateTime.UtcNow;
+            using var cmd = _db.CreateCommand();
+            cmd.CommandText =
+                """
+                INSERT INTO clips (collection_id, title, content, kind, color, pinned, copy_count, created_at, updated_at)
+                VALUES ($collection, $title, $content, $kind, $color, 0, 0, $now, $now);
+                SELECT last_insert_rowid();
+                """;
+            cmd.Parameters.AddWithValue("$collection", collectionId is null ? DBNull.Value : collectionId.Value);
+            cmd.Parameters.AddWithValue("$title", string.IsNullOrWhiteSpace(title) ? DBNull.Value : title.Trim());
+            cmd.Parameters.AddWithValue("$content", content);
+            cmd.Parameters.AddWithValue("$kind", kind);
+            cmd.Parameters.AddWithValue("$color", string.IsNullOrWhiteSpace(color) ? ClipColors.None : color);
+            cmd.Parameters.AddWithValue("$now", Format(now));
+            var id = (long)cmd.ExecuteScalar()!;
+            TrimUnlocked();
+            return GetByIdUnlocked(id) ?? throw new InvalidOperationException("Не удалось сохранить запись.");
+        }
+    }
+
+    public void Update(ClipItem item)
+    {
+        lock (_gate)
+        {
+            using var cmd = _db.CreateCommand();
+            cmd.CommandText =
+                """
+                UPDATE clips
+                SET collection_id = $collection,
+                    title = $title,
+                    content = $content,
+                    kind = $kind,
+                    color = $color,
+                    pinned = $pinned,
+                    copy_count = $copies,
+                    last_copied_at = $copied,
+                    updated_at = $updated
+                WHERE id = $id
+                """;
+            cmd.Parameters.AddWithValue("$collection", item.CollectionId is null ? DBNull.Value : item.CollectionId.Value);
+            cmd.Parameters.AddWithValue("$title", string.IsNullOrWhiteSpace(item.Title) ? DBNull.Value : item.Title.Trim());
+            cmd.Parameters.AddWithValue("$content", Normalize(item.Content));
+            cmd.Parameters.AddWithValue("$kind", item.Kind);
+            cmd.Parameters.AddWithValue("$color", item.Color);
+            cmd.Parameters.AddWithValue("$pinned", item.Pinned ? 1 : 0);
+            cmd.Parameters.AddWithValue("$copies", item.CopyCount);
+            cmd.Parameters.AddWithValue("$copied", item.LastCopiedAt is null ? DBNull.Value : Format(item.LastCopiedAt.Value));
+            cmd.Parameters.AddWithValue("$updated", Format(item.UpdatedAt));
+            cmd.Parameters.AddWithValue("$id", item.Id);
+            cmd.ExecuteNonQuery();
+        }
+    }
+
+    public void SetPinned(long id, bool pinned)
+    {
+        lock (_gate)
+        {
+            using var cmd = _db.CreateCommand();
+            cmd.CommandText = "UPDATE clips SET pinned = $pinned, updated_at = $now WHERE id = $id";
+            cmd.Parameters.AddWithValue("$pinned", pinned ? 1 : 0);
+            cmd.Parameters.AddWithValue("$now", Format(DateTime.UtcNow));
+            cmd.Parameters.AddWithValue("$id", id);
+            cmd.ExecuteNonQuery();
+        }
+    }
+
+    public void SetColor(long id, string color)
+    {
+        lock (_gate)
+        {
+            using var cmd = _db.CreateCommand();
+            cmd.CommandText = "UPDATE clips SET color = $color, updated_at = $now WHERE id = $id";
+            cmd.Parameters.AddWithValue("$color", color);
+            cmd.Parameters.AddWithValue("$now", Format(DateTime.UtcNow));
+            cmd.Parameters.AddWithValue("$id", id);
+            cmd.ExecuteNonQuery();
+        }
+    }
+
+    public void SetCollection(long id, long? collectionId)
+    {
+        lock (_gate)
+        {
+            using var cmd = _db.CreateCommand();
+            cmd.CommandText = "UPDATE clips SET collection_id = $collection, updated_at = $now WHERE id = $id";
+            cmd.Parameters.AddWithValue("$collection", collectionId is null ? DBNull.Value : collectionId.Value);
+            cmd.Parameters.AddWithValue("$now", Format(DateTime.UtcNow));
+            cmd.Parameters.AddWithValue("$id", id);
+            cmd.ExecuteNonQuery();
+        }
+    }
+
+    public void MarkCopied(long id)
+    {
+        lock (_gate)
+        {
+            using var cmd = _db.CreateCommand();
+            cmd.CommandText =
+                """
+                UPDATE clips
+                SET copy_count = copy_count + 1,
+                    last_copied_at = $now,
+                    updated_at = $now
+                WHERE id = $id
+                """;
+            cmd.Parameters.AddWithValue("$now", Format(DateTime.UtcNow));
+            cmd.Parameters.AddWithValue("$id", id);
+            cmd.ExecuteNonQuery();
+        }
+    }
+
+    public void Delete(long id)
+    {
+        lock (_gate)
+        {
+            using var cmd = _db.CreateCommand();
+            cmd.CommandText = "DELETE FROM clips WHERE id = $id";
+            cmd.Parameters.AddWithValue("$id", id);
+            cmd.ExecuteNonQuery();
+        }
     }
 
     public CollectionItem AddCollection(string name)
     {
         name = name.Trim();
-        if (name.Length == 0) throw new InvalidOperationException("Название пустое");
-        using var cmd = _db.CreateCommand();
-        cmd.CommandText = "insert into collections (name, created_at) values ($n, $t); select last_insert_rowid();";
-        cmd.Parameters.AddWithValue("$n", name[..Math.Min(name.Length, 48)]);
-        cmd.Parameters.AddWithValue("$t", DateTime.UtcNow.ToString("o"));
-        var id = (long)(cmd.ExecuteScalar() ?? 0);
-        return new CollectionItem { Id = id, Name = name, CreatedAt = DateTime.UtcNow };
+        if (name.Length == 0)
+            throw new InvalidOperationException("Название папки пустое.");
+
+        lock (_gate)
+        {
+            using var cmd = _db.CreateCommand();
+            cmd.CommandText =
+                """
+                INSERT INTO collections (name, created_at) VALUES ($name, $now);
+                SELECT last_insert_rowid();
+                """;
+            cmd.Parameters.AddWithValue("$name", name);
+            cmd.Parameters.AddWithValue("$now", Format(DateTime.UtcNow));
+            var id = (long)cmd.ExecuteScalar()!;
+            return new CollectionItem
+            {
+                Id = id,
+                Name = name,
+                CreatedAt = DateTime.UtcNow,
+                Count = 0,
+            };
+        }
     }
 
     public void DeleteCollection(long id)
     {
+        lock (_gate)
+        {
+            using var tx = _db.BeginTransaction();
+            using (var clear = _db.CreateCommand())
+            {
+                clear.Transaction = tx;
+                clear.CommandText = "UPDATE clips SET collection_id = NULL WHERE collection_id = $id";
+                clear.Parameters.AddWithValue("$id", id);
+                clear.ExecuteNonQuery();
+            }
+
+            using (var del = _db.CreateCommand())
+            {
+                del.Transaction = tx;
+                del.CommandText = "DELETE FROM collections WHERE id = $id";
+                del.Parameters.AddWithValue("$id", id);
+                del.ExecuteNonQuery();
+            }
+
+            tx.Commit();
+        }
+    }
+
+    public string? GetSetting(string key)
+    {
+        lock (_gate)
+        {
+            using var cmd = _db.CreateCommand();
+            cmd.CommandText = "SELECT value FROM settings WHERE key = $key";
+            cmd.Parameters.AddWithValue("$key", key);
+            return cmd.ExecuteScalar() as string;
+        }
+    }
+
+    public void SetSetting(string key, string value)
+    {
+        lock (_gate)
+        {
+            using var cmd = _db.CreateCommand();
+            cmd.CommandText =
+                """
+                INSERT INTO settings (key, value) VALUES ($key, $value)
+                ON CONFLICT(key) DO UPDATE SET value = excluded.value
+                """;
+            cmd.Parameters.AddWithValue("$key", key);
+            cmd.Parameters.AddWithValue("$value", value);
+            cmd.ExecuteNonQuery();
+        }
+    }
+
+    private ClipItem? GetLatestUnlocked()
+    {
         using var cmd = _db.CreateCommand();
-        cmd.CommandText = """
-            update clips set collection_id = null where collection_id = $id;
-            delete from collections where id = $id;
+        cmd.CommandText =
+            """
+            SELECT id, collection_id, title, content, kind, color, pinned,
+                   copy_count, last_copied_at, created_at, updated_at
+            FROM clips
+            ORDER BY id DESC
+            LIMIT 1
+            """;
+        var list = ReadClips(cmd);
+        return list.Count == 0 ? null : list[0];
+    }
+
+    private ClipItem? GetByIdUnlocked(long id)
+    {
+        using var cmd = _db.CreateCommand();
+        cmd.CommandText =
+            """
+            SELECT id, collection_id, title, content, kind, color, pinned,
+                   copy_count, last_copied_at, created_at, updated_at
+            FROM clips
+            WHERE id = $id
             """;
         cmd.Parameters.AddWithValue("$id", id);
-        cmd.ExecuteNonQuery();
+        var list = ReadClips(cmd);
+        return list.Count == 0 ? null : list[0];
     }
 
-    public (int All, int Pinned, int Clip, int Note, int Code, int Link) Counts()
+    private void TrimUnlocked()
     {
-        using var cmd = _db.CreateCommand();
-        cmd.CommandText = """
-            select
-              count(*),
-              sum(case when pinned = 1 then 1 else 0 end),
-              sum(case when kind = 'clip' then 1 else 0 end),
-              sum(case when kind = 'note' then 1 else 0 end),
-              sum(case when kind = 'code' then 1 else 0 end),
-              sum(case when kind = 'link' then 1 else 0 end)
-            from clips
-            """;
-        using var r = cmd.ExecuteReader();
-        r.Read();
-        return (
-            r.IsDBNull(0) ? 0 : r.GetInt32(0),
-            r.IsDBNull(1) ? 0 : r.GetInt32(1),
-            r.IsDBNull(2) ? 0 : r.GetInt32(2),
-            r.IsDBNull(3) ? 0 : r.GetInt32(3),
-            r.IsDBNull(4) ? 0 : r.GetInt32(4),
-            r.IsDBNull(5) ? 0 : r.GetInt32(5));
-    }
+        using var countCmd = _db.CreateCommand();
+        countCmd.CommandText = "SELECT COUNT(*) FROM clips";
+        var count = Convert.ToInt32(countCmd.ExecuteScalar(), CultureInfo.InvariantCulture);
+        if (count <= HistoryLimit)
+            return;
 
-    private void Trim()
-    {
-        using var cmd = _db.CreateCommand();
-        cmd.CommandText = """
-            delete from clips where id in (
-              select id from clips where pinned = 0
-              order by updated_at desc
-              limit -1 offset $keep
+        using var trim = _db.CreateCommand();
+        trim.CommandText =
+            """
+            DELETE FROM clips
+            WHERE id IN (
+                SELECT id FROM clips
+                WHERE pinned = 0
+                ORDER BY updated_at ASC, id ASC
+                LIMIT $extra
             )
             """;
-        cmd.Parameters.AddWithValue("$keep", HistoryLimit);
-        cmd.ExecuteNonQuery();
+        trim.Parameters.AddWithValue("$extra", count - HistoryLimit);
+        trim.ExecuteNonQuery();
     }
 
     private static List<ClipItem> ReadClips(SqliteCommand cmd)
     {
+        using var reader = cmd.ExecuteReader();
         var list = new List<ClipItem>();
-        using var r = cmd.ExecuteReader();
-        while (r.Read())
+        while (reader.Read())
         {
             list.Add(new ClipItem
             {
-                Id = r.GetInt64(0),
-                CollectionId = r.IsDBNull(1) ? null : r.GetInt64(1),
-                Title = r.IsDBNull(2) ? null : r.GetString(2),
-                Content = r.GetString(3),
-                Kind = r.GetString(4),
-                Color = r.GetString(5),
-                Pinned = r.GetInt32(6) == 1,
-                CopyCount = r.GetInt32(7),
-                CreatedAt = DateTime.Parse(r.GetString(8)),
-                UpdatedAt = DateTime.Parse(r.GetString(9)),
-                LastCopiedAt = r.IsDBNull(10) ? null : DateTime.Parse(r.GetString(10)),
+                Id = reader.GetInt64(0),
+                CollectionId = reader.IsDBNull(1) ? null : reader.GetInt64(1),
+                Title = reader.IsDBNull(2) ? null : reader.GetString(2),
+                Content = reader.GetString(3),
+                Kind = reader.GetString(4),
+                Color = reader.GetString(5),
+                Pinned = reader.GetInt32(6) != 0,
+                CopyCount = reader.GetInt32(7),
+                LastCopiedAt = reader.IsDBNull(8) ? null : Parse(reader.GetString(8)),
+                CreatedAt = Parse(reader.GetString(9)),
+                UpdatedAt = Parse(reader.GetString(10)),
             });
         }
+
         return list;
     }
 
-    public void Dispose() => _db.Dispose();
+    private static string Normalize(string content)
+    {
+        var text = content.Replace("\r\n", "\n").Replace('\r', '\n');
+        if (text.Length > MaxContentLength)
+            text = text[..MaxContentLength];
+        return text;
+    }
+
+    private static string Format(DateTime value)
+    {
+        var utc = value.Kind == DateTimeKind.Utc ? value : value.ToUniversalTime();
+        return utc.ToString("o", CultureInfo.InvariantCulture);
+    }
+
+    private static DateTime Parse(string value)
+        => DateTime.Parse(value, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind);
+
+    public void Dispose()
+    {
+        lock (_gate)
+        {
+            _db.Dispose();
+        }
+    }
 }
