@@ -939,11 +939,13 @@ public partial class MainWindow : Window
 
         if (useAcrylic && AcrylicHelper.Apply(this))
         {
+            WindowCorners.ClipHost = false;
             WindowFrame.Background = new SolidColorBrush(Color.FromArgb(0x66, tint.R, tint.G, tint.B));
         }
         else
         {
             AcrylicHelper.RemoveBackdrop(this, tint);
+            WindowCorners.ClipHost = true;
             WindowFrame.Background = hasPhoto
                 ? System.Windows.Media.Brushes.Transparent
                 : new SolidColorBrush(tint);

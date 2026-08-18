@@ -44,6 +44,7 @@ public static class AcrylicHelper
         }
 
         window.Background = System.Windows.Media.Brushes.Transparent;
+        WindowCorners.ClipHost = false;
         WindowCorners.Apply(window);
         return true;
     }
@@ -68,7 +69,11 @@ public static class AcrylicHelper
         NativeMethods.DwmSetWindowAttribute(
             hwnd, NativeMethods.DWMWA_MICA_EFFECT, ref micaOff, sizeof(int));
 
+        var margins = new NativeMethods.Margins();
+        NativeMethods.DwmExtendFrameIntoClientArea(hwnd, ref margins);
+
         window.Background = new SolidColorBrush(fill);
+        WindowCorners.ClipHost = true;
         WindowCorners.Apply(window);
     }
 
