@@ -31,7 +31,7 @@
 
     <Grid>
         <Border x:Name="WindowFrame"
-                BorderBrush="{StaticResource HairlineStrongBrush}"
+                BorderBrush="{StaticResource HairlineBrush}"
                 BorderThickness="1"
                 Background="Transparent"
                 CornerRadius="16"

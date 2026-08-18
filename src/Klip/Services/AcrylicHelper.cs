@@ -53,6 +53,10 @@ public static class AcrylicHelper
         var hwnd = new WindowInteropHelper(window).EnsureHandle();
         var source = HwndSource.FromHwnd(hwnd);
         var fill = solid ?? SolidFallback;
+        if (fill.A == 0)
+            fill = SolidFallback;
+        else if (fill.A < 255)
+            fill = Color.FromRgb(fill.R, fill.G, fill.B);
 
         if (source?.CompositionTarget is { } target)
             target.BackgroundColor = fill;

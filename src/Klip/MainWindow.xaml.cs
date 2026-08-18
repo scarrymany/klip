@@ -943,7 +943,7 @@ public partial class MainWindow : Window
         }
         else
         {
-            AcrylicHelper.RemoveBackdrop(this, hasPhoto ? Colors.Transparent : tint);
+            AcrylicHelper.RemoveBackdrop(this, tint);
             WindowFrame.Background = hasPhoto
                 ? System.Windows.Media.Brushes.Transparent
                 : new SolidColorBrush(tint);
