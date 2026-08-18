@@ -306,6 +306,8 @@
             <Setter Property="HorizontalScrollBarVisibility" Value="Disabled"/>
             <Setter Property="VerticalScrollBarVisibility" Value="Auto"/>
             <Setter Property="PanningMode" Value="VerticalOnly"/>
+            <Setter Property="CanContentScroll" Value="False"/>
+            <Setter Property="IsDeferredScrollingEnabled" Value="False"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ScrollViewer">

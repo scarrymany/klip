@@ -1,80 +1,86 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
-using System.Windows.Media.Animation;
+using System.Windows.Media;
 
 namespace Klip.Services;
 
 public static class SmoothScroll
 {
-    private static readonly DependencyProperty OffsetProperty = DependencyProperty.RegisterAttached(
-        "Offset",
-        typeof(double),
-        typeof(SmoothScroll),
-        new PropertyMetadata(0d, OnOffset));
+    private const double WheelScale = 0.52;
+    private const double Lerp = 0.2;
+    private const double Snap = 0.35;
 
-    private static readonly DependencyProperty TargetProperty = DependencyProperty.RegisterAttached(
-        "Target",
-        typeof(double),
-        typeof(SmoothScroll),
-        new PropertyMetadata(double.NaN));
-
-    private static readonly DependencyProperty HookedProperty = DependencyProperty.RegisterAttached(
-        "Hooked",
-        typeof(bool),
-        typeof(SmoothScroll),
-        new PropertyMetadata(false));
+    private static readonly DependencyProperty StateProperty = DependencyProperty.RegisterAttached(
+        "State",
+        typeof(Engine),
+        typeof(SmoothScroll));
 
     public static void Attach(ScrollViewer viewer)
     {
-        if (viewer is null || (bool)viewer.GetValue(HookedProperty))
-            return;
-        viewer.SetValue(HookedProperty, true);
-        viewer.PreviewMouseWheel += OnWheel;
-        viewer.ScrollChanged += OnScrollChanged;
-    }
-
-    private static void OnOffset(DependencyObject d, DependencyPropertyChangedEventArgs e)
-    {
-        if (d is ScrollViewer viewer)
-            viewer.ScrollToVerticalOffset((double)e.NewValue);
-    }
-
-    private static void OnWheel(object sender, MouseWheelEventArgs e)
-    {
-        if (sender is not ScrollViewer viewer || viewer.ScrollableHeight <= 0)
+        if (viewer is null || viewer.GetValue(StateProperty) is Engine)
             return;
 
-        e.Handled = true;
-        var current = viewer.VerticalOffset;
-        var stored = (double)viewer.GetValue(TargetProperty);
-        var from = double.IsNaN(stored) ? current : stored;
-        var step = e.Delta * 0.72;
-        var target = Math.Clamp(from - step, 0, viewer.ScrollableHeight);
-        viewer.SetValue(TargetProperty, target);
+        var engine = new Engine(viewer);
+        viewer.SetValue(StateProperty, engine);
+        viewer.PreviewMouseWheel += engine.OnWheel;
+        viewer.Unloaded += engine.OnUnloaded;
+    }
 
-        var anim = new DoubleAnimation(current, target, TimeSpan.FromMilliseconds(340))
+    private sealed class Engine
+    {
+        private readonly ScrollViewer _viewer;
+        private double _target = double.NaN;
+        private bool _running;
+
+        public Engine(ScrollViewer viewer) => _viewer = viewer;
+
+        public void OnWheel(object sender, MouseWheelEventArgs e)
         {
-            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut },
-            FillBehavior = FillBehavior.Stop,
-        };
-        anim.Completed += (_, _) =>
-        {
-            viewer.ScrollToVerticalOffset(target);
-            viewer.BeginAnimation(OffsetProperty, null);
-            if (Math.Abs((double)viewer.GetValue(TargetProperty) - target) < 0.5)
-                viewer.SetValue(TargetProperty, double.NaN);
-        };
-        viewer.BeginAnimation(OffsetProperty, anim);
-    }
+            if (_viewer.ScrollableHeight <= 0)
+                return;
 
-    private static void OnScrollChanged(object sender, ScrollChangedEventArgs e)
-    {
-        if (sender is not ScrollViewer viewer || e.ExtentHeightChange == 0)
-            return;
-        var stored = (double)viewer.GetValue(TargetProperty);
-        if (double.IsNaN(stored))
-            return;
-        viewer.SetValue(TargetProperty, Math.Clamp(stored, 0, viewer.ScrollableHeight));
+            e.Handled = true;
+            if (double.IsNaN(_target))
+                _target = _viewer.VerticalOffset;
+            _target = Math.Clamp(_target - e.Delta * WheelScale, 0, _viewer.ScrollableHeight);
+            if (!_running)
+            {
+                _running = true;
+                CompositionTarget.Rendering += OnFrame;
+            }
+        }
+
+        public void OnUnloaded(object sender, RoutedEventArgs e) => Stop();
+
+        private void OnFrame(object? sender, EventArgs e)
+        {
+            if (!_viewer.IsLoaded || double.IsNaN(_target))
+            {
+                Stop();
+                return;
+            }
+
+            var dest = Math.Clamp(_target, 0, _viewer.ScrollableHeight);
+            var cur = _viewer.VerticalOffset;
+            var next = cur + (dest - cur) * Lerp;
+            if (Math.Abs(dest - next) < Snap)
+            {
+                _viewer.ScrollToVerticalOffset(dest);
+                _target = double.NaN;
+                Stop();
+                return;
+            }
+
+            _viewer.ScrollToVerticalOffset(next);
+        }
+
+        private void Stop()
+        {
+            if (!_running)
+                return;
+            _running = false;
+            CompositionTarget.Rendering -= OnFrame;
+        }
     }
 }

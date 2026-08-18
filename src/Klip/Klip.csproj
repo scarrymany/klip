@@ -11,10 +11,10 @@
     <ApplicationIcon>Assets\klip.ico</ApplicationIcon>
     <RootNamespace>Klip</RootNamespace>
     <AssemblyName>Klip</AssemblyName>
-    <Version>1.0.9</Version>
-    <AssemblyVersion>1.0.9.0</AssemblyVersion>
-    <FileVersion>1.0.9.0</FileVersion>
-    <InformationalVersion>1.0.9</InformationalVersion>
+    <Version>1.0.10</Version>
+    <AssemblyVersion>1.0.10.0</AssemblyVersion>
+    <FileVersion>1.0.10.0</FileVersion>
+    <InformationalVersion>1.0.10</InformationalVersion>
     <Product>Клип</Product>
     <AssemblyTitle>Клип</AssemblyTitle>
     <Company>scarrymany</Company>

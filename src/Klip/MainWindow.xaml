@@ -42,8 +42,11 @@
                        Stretch="UniformToFill"
                        Visibility="Collapsed"
                        IsHitTestVisible="False">
+                    <Image.CacheMode>
+                        <BitmapCache RenderAtScale="1" EnableClearType="False" SnapsToDevicePixels="True"/>
+                    </Image.CacheMode>
                     <Image.Effect>
-                        <BlurEffect x:Name="WallpaperBlur" Radius="0" KernelType="Gaussian" RenderingBias="Quality"/>
+                        <BlurEffect x:Name="WallpaperBlur" Radius="0" KernelType="Gaussian" RenderingBias="Performance"/>
                     </Image.Effect>
                 </Image>
                 <Border x:Name="WallpaperDim"
@@ -547,7 +550,7 @@
             <Border x:Name="SettingsCard"
                     Width="460" MaxHeight="620"
                     VerticalAlignment="Center" HorizontalAlignment="Center"
-                    Background="#F016191F"
+                    Background="#F41A1D24"
                     BorderBrush="{StaticResource HairlineStrongBrush}"
                     BorderThickness="1"
                     CornerRadius="20"
