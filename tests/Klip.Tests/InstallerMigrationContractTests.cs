@@ -25,6 +25,7 @@ public sealed class InstallerMigrationContractTests
         Assert.Contains("function NeedRestart(): Boolean", script, StringComparison.Ordinal);
         Assert.Contains("LegacyMsiRestartRequired := True", script, StringComparison.Ordinal);
         Assert.DoesNotContain("[InstallDelete]", script, StringComparison.Ordinal);
+        Assert.DoesNotMatch(@"(?m)^\s+\[[^\r\n]+\]\);", script);
     }
 
     [Fact]

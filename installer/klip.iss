@@ -5,7 +5,7 @@
 #define MyAppExeName "Klip.exe"
 
 #ifndef MyAppVersion
-  #define MyAppVersion "1.2.2"
+  #define MyAppVersion "1.2.3"
 #endif
 
 #ifndef PublishDir
@@ -154,8 +154,7 @@ begin
       if InfoResult <> ErrorSuccess then
       begin
         Result := Format(
-          'Не удалось проверить версию установленного MSI Клип (код %d).',
-          [InfoResult]);
+          'Не удалось проверить версию установленного MSI Клип (код %d).', [InfoResult]);
         Exit;
       end;
       SetLength(ProductVersion, VersionSize);
@@ -166,8 +165,7 @@ begin
         Exit;
       end;
       ProductVersion := Format(
-        '%d.%d.%d',
-        [RawVersion shr 24, (RawVersion shr 16) and $FF, RawVersion and $FFFF]);
+        '%d.%d.%d', [RawVersion shr 24, (RawVersion shr 16) and $FF, RawVersion and $FFFF]);
       if not StrToVersion(ProductVersion, InstalledVersion) then
       begin
         Result := 'Не удалось распаковать версию установленного MSI Клип.';
@@ -176,15 +174,13 @@ begin
       if ComparePackedVersion(InstalledVersion, SetupVersion) > 0 then
       begin
         Result := Format(
-          'Уже установлена более новая MSI-версия Клип %s.',
-          [ProductVersion]);
+          'Уже установлена более новая MSI-версия Клип %s.', [ProductVersion]);
         Exit;
       end;
       if ComparePackedVersion(InstalledVersion, LegacyMaximumVersion) > 0 then
       begin
         Result := Format(
-          'MSI-версию Клип %s нужно удалить через Параметры Windows перед установкой EXE.',
-          [ProductVersion]);
+          'MSI-версию Клип %s нужно удалить через Параметры Windows перед установкой EXE.', [ProductVersion]);
         Exit;
       end;
 
@@ -196,8 +192,7 @@ begin
   if EnumResult <> ErrorNoMoreItems then
   begin
     Result := Format(
-      'Не удалось найти старые MSI-версии Клип (код %d).',
-      [EnumResult]);
+      'Не удалось найти старые MSI-версии Клип (код %d).', [EnumResult]);
   end;
 end;
 
@@ -229,8 +224,7 @@ begin
        (ExitCode <> ErrorSuccessRebootRequired) then
     begin
       Result := Format(
-        'Не удалось удалить старую MSI-версию Клип (код %d).',
-        [ExitCode]);
+        'Не удалось удалить старую MSI-версию Клип (код %d).', [ExitCode]);
       Exit;
     end;
 

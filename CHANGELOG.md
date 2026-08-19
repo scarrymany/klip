@@ -3,6 +3,12 @@
 Формат основан на [Keep a Changelog](https://keepachangelog.com/ru/1.1.0/),
 нумерация версий следует [семантическому версионированию](https://semver.org/lang/ru/).
 
+## [1.2.3] - 2026-08-19
+
+### Исправлено
+
+- Исправлена совместимость скрипта миграции со строковым парсером Inno Setup 6.7.
+
 ## [1.2.2] - 2026-08-19
 
 ### Исправлено
@@ -166,6 +172,7 @@
 - Окно без стандартного заголовка, тёмная layered-подложка и прозрачные скруглённые углы.
 - Сборка одним файлом win-x64, установщик Inno Setup, MSI на WiX и портативный zip.
 
+[1.2.3]: https://github.com/scarrymany/klip/releases/tag/v1.2.3
 [1.2.2]: https://github.com/scarrymany/klip/releases/tag/v1.2.2
 [1.2.1]: https://github.com/scarrymany/klip/releases/tag/v1.2.1
 [1.2.0]: https://github.com/scarrymany/klip/releases/tag/v1.2.0
