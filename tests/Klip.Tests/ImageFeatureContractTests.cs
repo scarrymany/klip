@@ -40,6 +40,18 @@ public sealed class ImageFeatureContractTests
         Assert.Contains("OpenImagePreview(item)", code, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void Image_thumbnail_fits_without_cropping()
+    {
+        var xaml = Read("src", "Klip", "MainWindow.xaml");
+        var thumbnailStart = xaml.IndexOf("x:Name=\"ImageThumbnail\"", StringComparison.Ordinal);
+        var thumbnailEnd = xaml.IndexOf("</Border>", thumbnailStart, StringComparison.Ordinal);
+        var thumbnail = xaml[thumbnailStart..thumbnailEnd];
+
+        Assert.Contains("Stretch=\"Uniform\"", thumbnail, StringComparison.Ordinal);
+        Assert.DoesNotContain("Stretch=\"UniformToFill\"", thumbnail, StringComparison.Ordinal);
+    }
+
     private static string Read(params string[] parts)
         => File.ReadAllText(Path.Combine([Root, .. parts]));
 

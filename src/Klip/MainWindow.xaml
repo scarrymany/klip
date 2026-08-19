@@ -377,7 +377,7 @@
                                                         Background="#20000000"
                                                         ClipToBounds="True">
                                                     <Image Source="{Binding ImagePath, Converter={StaticResource ImagePathConverter}, ConverterParameter=480}"
-                                                           Stretch="UniformToFill"/>
+                                                           Stretch="Uniform"/>
                                                 </Border>
                                                 <TextBlock Text="{Binding DisplayTitle}"
                                                            FontWeight="SemiBold"
