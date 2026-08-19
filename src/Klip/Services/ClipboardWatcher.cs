@@ -13,6 +13,8 @@ public sealed class ClipboardWatcher : IDisposable
 
     public event EventHandler<string>? TextCaptured;
 
+    public event EventHandler<ClipboardImageData>? ImageCaptured;
+
     public HwndSource? Source => _source;
 
     public void Start()
@@ -57,6 +59,23 @@ public sealed class ClipboardWatcher : IDisposable
         }
     }
 
+    public void CopyImage(string path)
+    {
+        var image = ClipboardImageCodec.LoadPng(path);
+        IgnoreOwnCopy();
+        try
+        {
+            var data = new DataObject();
+            data.SetImage(image);
+            System.Windows.Clipboard.SetDataObject(data, copy: true);
+        }
+        catch
+        {
+            Interlocked.Exchange(ref _ignoreOwn, 0);
+            throw;
+        }
+    }
+
     private IntPtr Hook(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
         if (msg != NativeMethods.WM_CLIPBOARDUPDATE)
@@ -79,6 +98,20 @@ public sealed class ClipboardWatcher : IDisposable
 
             try
             {
+                if (System.Windows.Clipboard.ContainsImage())
+                {
+                    var bitmap = System.Windows.Clipboard.GetImage();
+                    if (bitmap is null)
+                        return;
+                    var frozen = bitmap.Clone();
+                    frozen.Freeze();
+                    var image = await Task.Run(() => ClipboardImageCodec.EncodePng(frozen)).ConfigureAwait(true);
+                    if (epoch != Volatile.Read(ref _epoch))
+                        return;
+                    ImageCaptured?.Invoke(this, image);
+                    return;
+                }
+
                 if (!System.Windows.Clipboard.ContainsText())
                     return;
 

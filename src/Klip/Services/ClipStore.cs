@@ -10,12 +10,15 @@ namespace Klip.Services;
 public sealed class ClipStore : IDisposable
 {
     public const int HistoryLimit = 500;
+    public const int ImageHistoryLimit = 100;
+    public const int MaxImageBytes = 25 * 1024 * 1024;
     public const int MaxContentLength = 1_000_000;
     public const int ListPreviewLength = 500;
-    public const int SchemaVersion = 1;
+    public const int SchemaVersion = 2;
 
     private readonly SqliteConnection _db;
     private readonly object _gate = new();
+    private readonly string _imageDirectory;
 
     public static string DataDirectory { get; } = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
@@ -29,13 +32,15 @@ public sealed class ClipStore : IDisposable
 
     public ClipStore(string databasePath)
     {
-        var directory = Path.GetDirectoryName(databasePath);
+        var fullDatabasePath = Path.GetFullPath(databasePath);
+        var directory = Path.GetDirectoryName(fullDatabasePath);
         if (!string.IsNullOrEmpty(directory))
             Directory.CreateDirectory(directory);
+        _imageDirectory = Path.Combine(directory ?? DataDirectory, "images");
 
         _db = new SqliteConnection(new SqliteConnectionStringBuilder
         {
-            DataSource = databasePath,
+            DataSource = fullDatabasePath,
             ForeignKeys = true,
             Cache = SqliteCacheMode.Shared,
         }.ToString());
@@ -70,6 +75,9 @@ public sealed class ClipStore : IDisposable
                 last_copied_at TEXT,
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL,
+                image_path TEXT,
+                image_width INTEGER,
+                image_height INTEGER,
                 FOREIGN KEY (collection_id) REFERENCES collections(id) ON DELETE SET NULL
             );
 
@@ -85,6 +93,7 @@ public sealed class ClipStore : IDisposable
             """;
         cmd.ExecuteNonQuery();
         Migrate();
+        ReconcileImageFiles();
         SeedWelcome();
     }
 
@@ -93,6 +102,8 @@ public sealed class ClipStore : IDisposable
         var version = ReadUserVersion();
         if (version < 1)
             MigrateTo1();
+        if (ReadUserVersion() < 2)
+            MigrateTo2();
     }
 
     private void MigrateTo1()
@@ -131,6 +142,49 @@ public sealed class ClipStore : IDisposable
         Execute("CREATE INDEX IF NOT EXISTS clips_hash_idx ON clips (content_hash)");
         Execute("CREATE INDEX IF NOT EXISTS clips_source_idx ON clips (source)");
         SetUserVersion(1);
+    }
+
+    private void MigrateTo2()
+    {
+        if (!HasColumn("clips", "image_path"))
+            Execute("ALTER TABLE clips ADD COLUMN image_path TEXT");
+        if (!HasColumn("clips", "image_width"))
+            Execute("ALTER TABLE clips ADD COLUMN image_width INTEGER");
+        if (!HasColumn("clips", "image_height"))
+            Execute("ALTER TABLE clips ADD COLUMN image_height INTEGER");
+        SetUserVersion(2);
+    }
+
+    private void ReconcileImageFiles()
+    {
+        if (!Directory.Exists(_imageDirectory))
+            return;
+
+        try
+        {
+            using var cmd = _db.CreateCommand();
+            cmd.CommandText = "SELECT image_path FROM clips WHERE image_path IS NOT NULL";
+            using var reader = cmd.ExecuteReader();
+            var referenced = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            while (reader.Read())
+                referenced.Add(Path.GetFileName(reader.GetString(0)));
+
+            foreach (var path in Directory.EnumerateFiles(_imageDirectory))
+            {
+                var name = Path.GetFileName(path);
+                if (name.EndsWith(".tmp", StringComparison.OrdinalIgnoreCase) ||
+                    name.EndsWith(".png", StringComparison.OrdinalIgnoreCase) && !referenced.Contains(name))
+                {
+                    TryDeleteFile(path);
+                }
+            }
+        }
+        catch (IOException)
+        {
+        }
+        catch (UnauthorizedAccessException)
+        {
+        }
     }
 
     private void SeedWelcome()
@@ -172,7 +226,7 @@ public sealed class ClipStore : IDisposable
                 SELECT id, collection_id, title,
                        CASE WHEN length(content) > $preview THEN substr(content, 1, $preview) ELSE content END,
                        kind, color, pinned, copy_count, last_copied_at, created_at, updated_at,
-                       length(content), source
+                       length(content), source, image_path, image_width, image_height
                 FROM clips
                 ORDER BY pinned DESC, updated_at DESC, id DESC
                 """;
@@ -253,7 +307,7 @@ public sealed class ClipStore : IDisposable
                 return null;
 
             var existingId = FindIdByHashUnlocked(hash);
-            var now = DateTime.UtcNow;
+            var now = NextUpdatedAtUnlocked();
             if (existingId is { } id)
             {
                 using var bump = _db.CreateCommand();
@@ -281,6 +335,85 @@ public sealed class ClipStore : IDisposable
             var inserted = (long)cmd.ExecuteScalar()!;
             TrimUnlocked();
             return GetByIdUnlocked(inserted);
+        }
+    }
+
+    public ClipItem? TryAddImageFromClipboard(byte[] pngBytes, int width, int height)
+    {
+        if (pngBytes is null || pngBytes.Length == 0 || pngBytes.Length > MaxImageBytes)
+            return null;
+        if (width <= 0 || height <= 0)
+            return null;
+
+        var hash = HashBytes(pngBytes);
+        var fileName = hash + ".png";
+        Directory.CreateDirectory(_imageDirectory);
+        var imagePath = Path.Combine(_imageDirectory, fileName);
+        var createdFile = EnsureImageFile(imagePath, pngBytes);
+        lock (_gate)
+        {
+            try
+            {
+                if (!File.Exists(imagePath))
+                    createdFile |= EnsureImageFile(imagePath, pngBytes);
+                if (IsSameImageAsLatestUnlocked(hash))
+                    return null;
+
+                var now = NextUpdatedAtUnlocked();
+                if (FindImageIdByHashUnlocked(hash) is { } existingId)
+                {
+                    using var bump = _db.CreateCommand();
+                    bump.CommandText =
+                        """
+                        UPDATE clips
+                        SET updated_at = $now,
+                            content_hash = $hash,
+                            image_path = $path,
+                            image_width = $width,
+                            image_height = $height
+                        WHERE id = $id
+                        """;
+                    bump.Parameters.AddWithValue("$now", Format(now));
+                    bump.Parameters.AddWithValue("$hash", hash);
+                    bump.Parameters.AddWithValue("$path", fileName);
+                    bump.Parameters.AddWithValue("$width", width);
+                    bump.Parameters.AddWithValue("$height", height);
+                    bump.Parameters.AddWithValue("$id", existingId);
+                    bump.ExecuteNonQuery();
+                    createdFile = false;
+                    return GetByIdUnlocked(existingId);
+                }
+
+                using var cmd = _db.CreateCommand();
+                cmd.CommandText =
+                    """
+                    INSERT INTO clips (
+                        content, kind, color, pinned, copy_count, created_at, updated_at,
+                        source, content_hash, image_path, image_width, image_height)
+                    VALUES (
+                        '', $kind, 'none', 0, 0, $now, $now,
+                        $source, $hash, $path, $width, $height);
+                    SELECT last_insert_rowid();
+                    """;
+                cmd.Parameters.AddWithValue("$kind", ClipKinds.Image);
+                cmd.Parameters.AddWithValue("$now", Format(now));
+                cmd.Parameters.AddWithValue("$source", ClipSources.Clipboard);
+                cmd.Parameters.AddWithValue("$hash", hash);
+                cmd.Parameters.AddWithValue("$path", fileName);
+                cmd.Parameters.AddWithValue("$width", width);
+                cmd.Parameters.AddWithValue("$height", height);
+                var inserted = (long)cmd.ExecuteScalar()!;
+                createdFile = false;
+                TrimImagesUnlocked();
+                TrimUnlocked();
+                return GetByIdUnlocked(inserted);
+            }
+            catch
+            {
+                if (createdFile)
+                    TryDeleteFile(imagePath);
+                throw;
+            }
         }
     }
 
@@ -362,6 +495,8 @@ public sealed class ClipStore : IDisposable
             cmd.Parameters.AddWithValue("$now", Format(DateTime.UtcNow));
             cmd.Parameters.AddWithValue("$id", id);
             cmd.ExecuteNonQuery();
+            if (!pinned)
+                TrimImagesUnlocked();
         }
     }
 
@@ -414,10 +549,19 @@ public sealed class ClipStore : IDisposable
     {
         lock (_gate)
         {
+            string? imagePath;
+            using (var select = _db.CreateCommand())
+            {
+                select.CommandText = "SELECT image_path FROM clips WHERE id = $id";
+                select.Parameters.AddWithValue("$id", id);
+                imagePath = select.ExecuteScalar() as string;
+            }
+
             using var cmd = _db.CreateCommand();
             cmd.CommandText = "DELETE FROM clips WHERE id = $id";
             cmd.Parameters.AddWithValue("$id", id);
-            cmd.ExecuteNonQuery();
+            if (cmd.ExecuteNonQuery() > 0)
+                DeleteImageIfUnreferencedUnlocked(imagePath);
         }
     }
 
@@ -506,6 +650,9 @@ public sealed class ClipStore : IDisposable
         return Convert.ToHexString(bytes).ToLowerInvariant();
     }
 
+    public static string HashBytes(byte[] bytes)
+        => Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
+
     public static string EscapeLike(string value)
         => value.Replace("\\", "\\\\", StringComparison.Ordinal)
             .Replace("%", "\\%", StringComparison.Ordinal)
@@ -524,30 +671,64 @@ public sealed class ClipStore : IDisposable
         using var cmd = _db.CreateCommand();
         cmd.CommandText =
             """
-            SELECT content, content_hash
+            SELECT kind, content, content_hash
             FROM clips
-            ORDER BY id DESC
+            ORDER BY updated_at DESC, id DESC
             LIMIT 1
             """;
         using var reader = cmd.ExecuteReader();
         if (!reader.Read())
             return false;
+        if (reader.GetString(0) == ClipKinds.Image)
+            return false;
 
-        if (!reader.IsDBNull(1))
+        if (!reader.IsDBNull(2))
         {
-            var latestHash = reader.GetString(1);
+            var latestHash = reader.GetString(2);
             if (!string.IsNullOrEmpty(latestHash))
                 return string.Equals(latestHash, hash, StringComparison.Ordinal);
         }
 
-        return reader.GetString(0) == content;
+        return reader.GetString(1) == content;
+    }
+
+    private bool IsSameImageAsLatestUnlocked(string hash)
+    {
+        using var cmd = _db.CreateCommand();
+        cmd.CommandText =
+            """
+            SELECT kind, content_hash
+            FROM clips
+            ORDER BY updated_at DESC, id DESC
+            LIMIT 1
+            """;
+        using var reader = cmd.ExecuteReader();
+        return reader.Read()
+               && reader.GetString(0) == ClipKinds.Image
+               && !reader.IsDBNull(1)
+               && reader.GetString(1).Equals(hash, StringComparison.Ordinal);
     }
 
     private long? FindIdByHashUnlocked(string hash)
     {
         using var cmd = _db.CreateCommand();
-        cmd.CommandText = "SELECT id FROM clips WHERE content_hash = $hash ORDER BY updated_at DESC, id DESC LIMIT 1";
+        cmd.CommandText =
+            "SELECT id FROM clips WHERE content_hash = $hash AND kind <> $image ORDER BY updated_at DESC, id DESC LIMIT 1";
         cmd.Parameters.AddWithValue("$hash", hash);
+        cmd.Parameters.AddWithValue("$image", ClipKinds.Image);
+        var value = cmd.ExecuteScalar();
+        if (value is null or DBNull)
+            return null;
+        return Convert.ToInt64(value, CultureInfo.InvariantCulture);
+    }
+
+    private long? FindImageIdByHashUnlocked(string hash)
+    {
+        using var cmd = _db.CreateCommand();
+        cmd.CommandText =
+            "SELECT id FROM clips WHERE content_hash = $hash AND kind = $image ORDER BY updated_at DESC, id DESC LIMIT 1";
+        cmd.Parameters.AddWithValue("$hash", hash);
+        cmd.Parameters.AddWithValue("$image", ClipKinds.Image);
         var value = cmd.ExecuteScalar();
         if (value is null or DBNull)
             return null;
@@ -561,7 +742,7 @@ public sealed class ClipStore : IDisposable
             """
             SELECT id, collection_id, title, content, kind, color, pinned,
                    copy_count, last_copied_at, created_at, updated_at,
-                   length(content), source
+                   length(content), source, image_path, image_width, image_height
             FROM clips
             WHERE id = $id
             """;
@@ -578,22 +759,119 @@ public sealed class ClipStore : IDisposable
         if (count <= HistoryLimit)
             return;
 
-        using var trim = _db.CreateCommand();
-        trim.CommandText =
+        using var select = _db.CreateCommand();
+        select.CommandText =
             """
-            DELETE FROM clips
-            WHERE id IN (
-                SELECT id FROM clips
-                WHERE pinned = 0 AND source = 'clipboard'
-                ORDER BY updated_at ASC, id ASC
-                LIMIT $extra
-            )
+            SELECT id, image_path FROM clips
+            WHERE pinned = 0 AND source = 'clipboard'
+            ORDER BY updated_at ASC, id ASC
+            LIMIT $extra
             """;
-        trim.Parameters.AddWithValue("$extra", count - HistoryLimit);
-        trim.ExecuteNonQuery();
+        select.Parameters.AddWithValue("$extra", count - HistoryLimit);
+        DeleteRowsUnlocked(ReadRowsToDelete(select));
     }
 
-    private static List<ClipItem> ReadClips(SqliteCommand cmd, bool includeLength, bool fullContent = false)
+    private void TrimImagesUnlocked()
+    {
+        using var select = _db.CreateCommand();
+        select.CommandText =
+            """
+            SELECT id, image_path FROM clips
+            WHERE pinned = 0 AND kind = $kind
+            ORDER BY updated_at DESC, id DESC
+            LIMIT -1 OFFSET $limit
+            """;
+        select.Parameters.AddWithValue("$kind", ClipKinds.Image);
+        select.Parameters.AddWithValue("$limit", ImageHistoryLimit);
+        DeleteRowsUnlocked(ReadRowsToDelete(select));
+    }
+
+    private static List<(long Id, string? ImagePath)> ReadRowsToDelete(SqliteCommand cmd)
+    {
+        using var reader = cmd.ExecuteReader();
+        var rows = new List<(long, string?)>();
+        while (reader.Read())
+            rows.Add((reader.GetInt64(0), reader.IsDBNull(1) ? null : reader.GetString(1)));
+        return rows;
+    }
+
+    private void DeleteRowsUnlocked(IReadOnlyList<(long Id, string? ImagePath)> rows)
+    {
+        if (rows.Count == 0)
+            return;
+
+        using var tx = _db.BeginTransaction();
+        foreach (var row in rows)
+        {
+            using var delete = _db.CreateCommand();
+            delete.Transaction = tx;
+            delete.CommandText = "DELETE FROM clips WHERE id = $id";
+            delete.Parameters.AddWithValue("$id", row.Id);
+            delete.ExecuteNonQuery();
+        }
+        tx.Commit();
+
+        foreach (var imagePath in rows.Select(row => row.ImagePath).Distinct(StringComparer.OrdinalIgnoreCase))
+            DeleteImageIfUnreferencedUnlocked(imagePath);
+    }
+
+    private bool EnsureImageFile(string path, byte[] bytes)
+    {
+        if (File.Exists(path))
+            return false;
+
+        var tempPath = Path.Combine(_imageDirectory, $".{Guid.NewGuid():N}.tmp");
+        try
+        {
+            File.WriteAllBytes(tempPath, bytes);
+            try
+            {
+                File.Move(tempPath, path);
+                return true;
+            }
+            catch (IOException) when (File.Exists(path))
+            {
+                return false;
+            }
+        }
+        finally
+        {
+            TryDeleteFile(tempPath);
+        }
+    }
+
+    private void DeleteImageIfUnreferencedUnlocked(string? storedPath)
+    {
+        if (string.IsNullOrWhiteSpace(storedPath))
+            return;
+
+        using var count = _db.CreateCommand();
+        count.CommandText = "SELECT COUNT(*) FROM clips WHERE image_path = $path";
+        count.Parameters.AddWithValue("$path", storedPath);
+        if (Convert.ToInt32(count.ExecuteScalar(), CultureInfo.InvariantCulture) != 0)
+            return;
+
+        TryDeleteFile(ResolveImagePath(storedPath));
+    }
+
+    private string ResolveImagePath(string storedPath)
+        => Path.Combine(_imageDirectory, Path.GetFileName(storedPath));
+
+    private static void TryDeleteFile(string path)
+    {
+        try
+        {
+            File.Delete(path);
+        }
+        catch (IOException)
+        {
+        }
+        catch (UnauthorizedAccessException)
+        {
+        }
+    }
+
+    private List<ClipItem> ReadClips(SqliteCommand cmd, bool includeLength, bool fullContent = false)
     {
         using var reader = cmd.ExecuteReader();
         var list = new List<ClipItem>();
@@ -602,6 +880,7 @@ public sealed class ClipStore : IDisposable
             var content = reader.GetString(3);
             var length = includeLength ? reader.GetInt32(11) : content.Length;
             var source = includeLength && !reader.IsDBNull(12) ? reader.GetString(12) : ClipSources.Clipboard;
+            var imagePath = reader.IsDBNull(13) ? null : ResolveImagePath(reader.GetString(13));
             list.Add(new ClipItem
             {
                 Id = reader.GetInt64(0),
@@ -617,6 +896,9 @@ public sealed class ClipStore : IDisposable
                 UpdatedAt = Parse(reader.GetString(10)),
                 Source = source,
                 HasFullContent = fullContent || length <= content.Length,
+                ImagePath = imagePath,
+                ImageWidth = reader.IsDBNull(14) ? null : reader.GetInt32(14),
+                ImageHeight = reader.IsDBNull(15) ? null : reader.GetInt32(15),
             });
         }
 
@@ -662,6 +944,20 @@ public sealed class ClipStore : IDisposable
     {
         var utc = value.Kind == DateTimeKind.Utc ? value : value.ToUniversalTime();
         return utc.ToString("o", CultureInfo.InvariantCulture);
+    }
+
+    private DateTime NextUpdatedAtUnlocked()
+    {
+        var now = DateTime.UtcNow;
+        using var cmd = _db.CreateCommand();
+        cmd.CommandText = "SELECT MAX(updated_at) FROM clips";
+        if (cmd.ExecuteScalar() is string latest)
+        {
+            var parsed = Parse(latest);
+            if (parsed >= now)
+                return parsed.AddTicks(1);
+        }
+        return now;
     }
 
     private static DateTime Parse(string value)

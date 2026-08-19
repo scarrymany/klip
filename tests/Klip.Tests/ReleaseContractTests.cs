@@ -35,7 +35,7 @@ public sealed class ReleaseContractTests
     [Fact]
     public void Release_version_is_synchronized()
     {
-        const string version = "1.1.2";
+        const string version = "1.2.0";
         var project = XDocument.Parse(Read("src", "Klip", "Klip.csproj"));
         var properties = project.Root!.Elements("PropertyGroup").Elements().ToDictionary(x => x.Name.LocalName, x => x.Value);
 
@@ -57,7 +57,7 @@ public sealed class ReleaseContractTests
         var workflow = Read(".github", "workflows", "release.yml");
 
         Assert.Contains("Klip-Setup-${{ needs.build.outputs.version }}.exe", workflow, StringComparison.Ordinal);
-        Assert.DoesNotContain("Klip-Setup-1.1.2.exe", workflow, StringComparison.Ordinal);
+        Assert.DoesNotContain("Klip-Setup-1.2.0.exe", workflow, StringComparison.Ordinal);
     }
 
     [Fact]

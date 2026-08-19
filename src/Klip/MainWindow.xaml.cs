@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -27,6 +28,7 @@ public partial class MainWindow : Window
     private readonly ObservableCollection<ClipItem> _visible = [];
     private readonly DispatcherTimer _toastTimer;
     private readonly DispatcherTimer _updateTimer;
+    private readonly DispatcherTimer _imageClickTimer;
     private readonly Dictionary<string, WpfButton> _nav = [];
 
     private string _filter = "all";
@@ -34,6 +36,8 @@ public partial class MainWindow : Window
     private bool _syncingUi;
     private bool _updating;
     private ClipItem? _editing;
+    private ClipItem? _pendingImageCopy;
+    private ClipItem? _previewImage;
     private UpdateInfo? _pendingUpdate;
     private CancellationTokenSource? _updateCts;
     private string _editorKind = ClipKinds.Clip;
@@ -46,7 +50,7 @@ public partial class MainWindow : Window
     private readonly DispatcherTimer _themeSaveTimer;
     private readonly DispatcherTimer _themeApplyTimer;
 
-    private static readonly string[] NavOrder = ["all", "pinned", "clip", "note", "code", "link"];
+    private static readonly string[] NavOrder = ["all", "pinned", "clip", "note", "code", "link", "image"];
 
     public ObservableCollection<ClipItem> VisibleClips => _visible;
 
@@ -68,12 +72,24 @@ public partial class MainWindow : Window
         _nav["note"] = NavNote;
         _nav["code"] = NavCode;
         _nav["link"] = NavLink;
+        _nav["image"] = NavImage;
 
         _toastTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1.6) };
         _toastTimer.Tick += (_, _) =>
         {
             ToastHost.Visibility = Visibility.Collapsed;
             _toastTimer.Stop();
+        };
+        _imageClickTimer = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(System.Windows.Forms.SystemInformation.DoubleClickTime),
+        };
+        _imageClickTimer.Tick += (_, _) =>
+        {
+            _imageClickTimer.Stop();
+            if (_pendingImageCopy is { } item)
+                CopyItem(item, hideAfter: true);
+            _pendingImageCopy = null;
         };
 
         SearchBox.GotFocus += (_, _) => SearchHint.Visibility = Visibility.Collapsed;
@@ -150,6 +166,7 @@ public partial class MainWindow : Window
         CountNote.Text = _all.Count(c => c.Kind == ClipKinds.Note).ToString(CultureInfo.InvariantCulture);
         CountCode.Text = _all.Count(c => c.Kind == ClipKinds.Code).ToString(CultureInfo.InvariantCulture);
         CountLink.Text = _all.Count(c => c.Kind == ClipKinds.Link).ToString(CultureInfo.InvariantCulture);
+        CountImage.Text = _all.Count(c => c.Kind == ClipKinds.Image).ToString(CultureInfo.InvariantCulture);
         TitleCount.Text = FormatRecords(_all.Count);
 
         ApplyFilter(selectedId);
@@ -160,6 +177,13 @@ public partial class MainWindow : Window
 
     public void AddCaptured(ClipItem item)
     {
+        if (item.IsImage)
+        {
+            Reload(keepSelection: false);
+            ApplyFilter(item.Id);
+            return;
+        }
+
         var existing = _all.FindIndex(c => c.Id == item.Id);
         if (existing >= 0)
             _all.RemoveAt(existing);
@@ -173,6 +197,7 @@ public partial class MainWindow : Window
         CountNote.Text = _all.Count(c => c.Kind == ClipKinds.Note).ToString(CultureInfo.InvariantCulture);
         CountCode.Text = _all.Count(c => c.Kind == ClipKinds.Code).ToString(CultureInfo.InvariantCulture);
         CountLink.Text = _all.Count(c => c.Kind == ClipKinds.Link).ToString(CultureInfo.InvariantCulture);
+        CountImage.Text = _all.Count(c => c.Kind == ClipKinds.Image).ToString(CultureInfo.InvariantCulture);
         TitleCount.Text = FormatRecords(_all.Count);
         ApplyFilter(item.Id);
     }
@@ -361,7 +386,7 @@ public partial class MainWindow : Window
         IEnumerable<ClipItem> query = _all;
         if (_filter == "pinned")
             query = query.Where(c => c.Pinned);
-        else if (_filter is ClipKinds.Clip or ClipKinds.Note or ClipKinds.Code or ClipKinds.Link)
+        else if (_filter is ClipKinds.Clip or ClipKinds.Note or ClipKinds.Code or ClipKinds.Link or ClipKinds.Image)
             query = query.Where(c => c.Kind == _filter);
         else if (_filter.StartsWith("collection:", StringComparison.Ordinal))
         {
@@ -389,7 +414,7 @@ public partial class MainWindow : Window
         if (_all.Count == 0)
         {
             EmptyTitle.Text = "Буфер ещё пуст";
-            EmptyHint.Text = "Скопируйте текст в любой программе - он появится здесь. Нажмите на карточку, чтобы вернуть его в буфер.";
+            EmptyHint.Text = "Скопируйте текст или сделайте снимок Win + Shift + S. Нажмите на карточку, чтобы вернуть содержимое в буфер.";
         }
         else
         {
@@ -471,24 +496,49 @@ public partial class MainWindow : Window
 
     private void OnClipClick(object sender, WpfMouseButtonEventArgs e)
     {
+        _imageClickTimer.Stop();
+        _pendingImageCopy = null;
         if (FindParent<WpfButton>(e.OriginalSource as DependencyObject) is not null)
             return;
-        if (ClipList.SelectedItem is ClipItem item)
-            CopyItem(item, hideAfter: true);
-    }
-
-    private void OnClipDoubleClick(object sender, WpfMouseButtonEventArgs e)
-    {
-        if (ClipList.SelectedItem is ClipItem item)
-            OpenEditor(item);
+        var container = FindParent<ListBoxItem>(e.OriginalSource as DependencyObject);
+        if (container?.DataContext is ClipItem item)
+        {
+            if (item.IsImage)
+            {
+                if (e.ClickCount >= 2)
+                {
+                    OpenImagePreview(item);
+                    e.Handled = true;
+                }
+                else
+                {
+                    _pendingImageCopy = item;
+                    _imageClickTimer.Stop();
+                    _imageClickTimer.Start();
+                }
+            }
+            else
+            {
+                CopyItem(item, hideAfter: true);
+            }
+        }
     }
 
     private void CopyItem(ClipItem item, bool hideAfter)
     {
         try
         {
-            item = Hydrate(item);
-            _watcher.CopyText(item.Content);
+            if (item.IsImage)
+            {
+                if (item.ImagePath is not { } path || !File.Exists(path))
+                    throw new FileNotFoundException("Файл изображения не найден.", item.ImagePath);
+                _watcher.CopyImage(path);
+            }
+            else
+            {
+                item = Hydrate(item);
+                _watcher.CopyText(item.Content);
+            }
             _store.MarkCopied(item.Id);
             item.CopyCount++;
             item.LastCopiedAt = DateTime.UtcNow;
@@ -496,6 +546,70 @@ public partial class MainWindow : Window
             Notify("Скопировано");
             if (hideAfter)
                 HideToTray();
+        }
+        catch (Exception ex)
+        {
+            Notify(ex.Message);
+        }
+    }
+
+    private void OpenImagePreview(ClipItem item)
+    {
+        try
+        {
+            if (item.ImagePath is not { } path || !File.Exists(path))
+                throw new FileNotFoundException("Файл изображения не найден.", item.ImagePath);
+
+            _previewImage = item;
+            ImagePreview.Source = ClipboardImageCodec.LoadPng(path);
+            ImagePreviewMeta.Text = $"{item.Preview}  ·  {item.MetaLabel}";
+            PlayOverlay(ImagePreviewOverlay, ImagePreviewCard, show: true);
+        }
+        catch (Exception ex)
+        {
+            Notify(ex.Message);
+        }
+    }
+
+    private void CloseImagePreview()
+    {
+        PlayOverlay(ImagePreviewOverlay, ImagePreviewCard, show: false);
+        ImagePreview.Source = null;
+        _previewImage = null;
+    }
+
+    private void OnImagePreviewClose(object sender, RoutedEventArgs e)
+        => CloseImagePreview();
+
+    private void OnImagePreviewCopy(object sender, RoutedEventArgs e)
+    {
+        if (_previewImage is { } item)
+            CopyItem(item, hideAfter: false);
+    }
+
+    private void OnImageSaveAs(object sender, RoutedEventArgs e)
+    {
+        if (_previewImage is not { ImagePath: { } source } item || !File.Exists(source))
+        {
+            Notify("Файл изображения не найден");
+            return;
+        }
+
+        var dialog = new Microsoft.Win32.SaveFileDialog
+        {
+            Title = "Сохранить изображение",
+            Filter = "PNG изображение|*.png",
+            DefaultExt = ".png",
+            AddExtension = true,
+            FileName = $"Klip-{item.CreatedAt.ToLocalTime():yyyy-MM-dd-HHmmss}.png",
+        };
+        if (dialog.ShowDialog(this) != true)
+            return;
+
+        try
+        {
+            File.Copy(source, dialog.FileName, overwrite: true);
+            Notify("Изображение сохранено");
         }
         catch (Exception ex)
         {
@@ -542,6 +656,12 @@ public partial class MainWindow : Window
 
     private void OpenEditor(ClipItem? item)
     {
+        if (item?.IsImage == true)
+        {
+            OpenImagePreview(item);
+            return;
+        }
+
         if (item is not null)
             item = Hydrate(item);
         _editing = item;
@@ -788,7 +908,9 @@ public partial class MainWindow : Window
     {
         if (e.Key == Key.Escape)
         {
-            if (SettingsOverlay.Visibility == Visibility.Visible)
+            if (ImagePreviewOverlay.Visibility == Visibility.Visible)
+                CloseImagePreview();
+            else if (SettingsOverlay.Visibility == Visibility.Visible)
                 CloseSettings();
             else if (EditorOverlay.Visibility == Visibility.Visible)
                 PlayOverlay(EditorOverlay, EditorCard, show: false);

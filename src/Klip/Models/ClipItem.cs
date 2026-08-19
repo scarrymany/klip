@@ -18,8 +18,9 @@ public static class ClipKinds
     public const string Note = "note";
     public const string Code = "code";
     public const string Link = "link";
+    public const string Image = "image";
 
-    public static readonly string[] All = [Clip, Note, Code, Link];
+    public static readonly string[] All = [Clip, Note, Code, Link, Image];
 
     private static readonly Regex LinkRegex = new(
         @"^https?://\S+$",
@@ -55,6 +56,7 @@ public static class ClipKinds
         Note => "Заметка",
         Code => "Код",
         Link => "Ссылка",
+        Image => "Изображение",
         _ => "Фрагмент",
     };
 }
@@ -162,6 +164,9 @@ public sealed class ClipItem : INotifyPropertyChanged
             {
                 OnPropertyChanged(nameof(KindLabel));
                 OnPropertyChanged(nameof(IsCode));
+                OnPropertyChanged(nameof(IsImage));
+                OnPropertyChanged(nameof(DisplayTitle));
+                OnPropertyChanged(nameof(Preview));
             }
         }
     }
@@ -204,6 +209,12 @@ public sealed class ClipItem : INotifyPropertyChanged
 
     public bool HasFullContent { get; set; } = true;
 
+    public string? ImagePath { get; set; }
+
+    public int? ImageWidth { get; set; }
+
+    public int? ImageHeight { get; set; }
+
     public DateTime UpdatedAt
     {
         get => _updatedAt;
@@ -218,17 +229,24 @@ public sealed class ClipItem : INotifyPropertyChanged
     {
         get
         {
+            if (IsImage)
+                return "Изображение";
             if (!string.IsNullOrWhiteSpace(Title))
                 return Title.Trim();
             return PreviewText(Content, 48);
         }
     }
 
-    public string Preview => PreviewText(Content, 220);
+    public string Preview
+        => IsImage && ImageWidth is { } width && ImageHeight is { } height
+            ? $"{width} × {height}"
+            : PreviewText(Content, 220);
 
     public string KindLabel => ClipKinds.Label(Kind);
 
     public bool IsCode => Kind == ClipKinds.Code;
+
+    public bool IsImage => Kind == ClipKinds.Image;
 
     public Brush MarkBrush => ClipColors.BrushFor(Color);
 

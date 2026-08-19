@@ -20,6 +20,8 @@ public partial class App : System.Windows.Application
     private TrayService? _tray;
     private MainWindow? _window;
     private bool _exitRequested;
+    private readonly object _imageQueueGate = new();
+    private Task _imageQueue = Task.CompletedTask;
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -71,8 +73,9 @@ public partial class App : System.Windows.Application
             _window = new MainWindow(_store, _watcher);
             MainWindow = _window;
 
-            _watcher.Start();
             _watcher.TextCaptured += OnClipboardText;
+            _watcher.ImageCaptured += OnClipboardImage;
+            _watcher.Start();
 
             if (_watcher.Source is HwndSource source)
             {
@@ -115,6 +118,35 @@ public partial class App : System.Windows.Application
             Apply();
         else
             Dispatcher.BeginInvoke(Apply);
+    }
+
+    private void OnClipboardImage(object? sender, ClipboardImageData image)
+    {
+        if (_exitRequested)
+            return;
+        lock (_imageQueueGate)
+        {
+            _imageQueue = _imageQueue.ContinueWith(
+                _ => StoreClipboardImage(image),
+                CancellationToken.None,
+                TaskContinuationOptions.None,
+                TaskScheduler.Default);
+        }
+    }
+
+    private void StoreClipboardImage(ClipboardImageData image)
+    {
+        try
+        {
+            var added = _store?.TryAddImageFromClipboard(image.PngBytes, image.Width, image.Height);
+            if (added is not null && !Dispatcher.HasShutdownStarted)
+                Dispatcher.BeginInvoke(() => _window?.AddCaptured(added));
+        }
+        catch (Exception ex)
+        {
+            if (!Dispatcher.HasShutdownStarted)
+                Dispatcher.BeginInvoke(() => _window?.Notify(ex.Message));
+        }
     }
 
     private IntPtr SingleInstanceHook(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
@@ -215,10 +247,22 @@ public partial class App : System.Windows.Application
 
     protected override void OnExit(ExitEventArgs e)
     {
+        _exitRequested = true;
         PersistWindowBounds();
         _hotkey?.Dispose();
         _watcher?.Dispose();
         _tray?.Dispose();
+        Task pendingImages;
+        lock (_imageQueueGate)
+            pendingImages = _imageQueue;
+        try
+        {
+            pendingImages.GetAwaiter().GetResult();
+        }
+        catch
+        {
+            // Storage errors are already reported by the queue worker.
+        }
         _store?.Dispose();
         if (_mutex is not null)
         {

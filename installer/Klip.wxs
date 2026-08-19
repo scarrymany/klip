@@ -3,7 +3,7 @@
     <?define PublishDir = "$(sys.SOURCEFILEDIR)..\dist\app" ?>
   <?endif?>
   <?ifndef ProductVersion ?>
-    <?define ProductVersion = "1.1.2" ?>
+    <?define ProductVersion = "1.2.0" ?>
   <?endif?>
 
   <Package Name="Клип"

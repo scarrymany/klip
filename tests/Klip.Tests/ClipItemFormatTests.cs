@@ -25,4 +25,24 @@ public sealed class ClipItemFormatTests
         Assert.EndsWith("…", preview, StringComparison.Ordinal);
         Assert.True(preview.Length <= 7);
     }
+
+    [Fact]
+    public void Image_uses_image_title_dimensions_and_flags()
+    {
+        var item = new ClipItem
+        {
+            Title = "Ignored title",
+            Content = "ignored content",
+            Kind = ClipKinds.Image,
+            ImagePath = @"C:\temp\image.png",
+            ImageWidth = 1920,
+            ImageHeight = 1080,
+        };
+
+        Assert.True(item.IsImage);
+        Assert.False(item.IsCode);
+        Assert.Equal("Изображение", item.DisplayTitle);
+        Assert.Equal("1920 × 1080", item.Preview);
+        Assert.Equal(@"C:\temp\image.png", item.ImagePath);
+    }
 }

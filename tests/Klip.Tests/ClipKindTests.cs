@@ -30,4 +30,11 @@ public sealed class ClipKindTests
     [Fact]
     public void Short_plain_text_is_clip()
         => Assert.Equal(ClipKinds.Clip, ClipKinds.Detect("hello world"));
+
+    [Fact]
+    public void Image_kind_is_available_and_has_russian_label()
+    {
+        Assert.Contains(ClipKinds.Image, ClipKinds.All);
+        Assert.Equal("Изображение", ClipKinds.Label(ClipKinds.Image));
+    }
 }
