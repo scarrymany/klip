@@ -71,7 +71,7 @@ public sealed class ClipStoreTests : IDisposable
         Assert.Equal("", added.Content);
         Assert.Equal(1920, added.ImageWidth);
         Assert.Equal(1080, added.ImageHeight);
-        Assert.True(Path.IsPathFullyQualified(added.ImagePath));
+        Assert.True(Path.IsPathFullyQualified(added.ImagePath!));
         Assert.Equal(Path.Combine(_dir, "images", hash + ".png"), added.ImagePath);
         Assert.Equal(bytes, File.ReadAllBytes(added.ImagePath!));
 
