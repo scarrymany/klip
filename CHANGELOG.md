@@ -3,6 +3,12 @@
 Формат основан на [Keep a Changelog](https://keepachangelog.com/ru/1.1.0/),
 нумерация версий следует [семантическому версионированию](https://semver.org/lang/ru/).
 
+## [1.1.2] - 2026-08-19
+
+### Добавлено
+
+- Кнопка Telegram в заголовке окна открывает профиль `@yeet17`.
+
 ## [1.1.1] - 2026-08-19
 
 ### Добавлено
@@ -132,6 +138,7 @@
 - Окно без стандартного заголовка, тёмная layered-подложка и прозрачные скруглённые углы.
 - Сборка одним файлом win-x64, установщик Inno Setup, MSI на WiX и портативный zip.
 
+[1.1.2]: https://github.com/scarrymany/klip/releases/tag/v1.1.2
 [1.1.1]: https://github.com/scarrymany/klip/releases/tag/v1.1.1
 [1.1.0]: https://github.com/scarrymany/klip/releases/tag/v1.1.0
 [1.0.10]: https://github.com/scarrymany/klip/releases/tag/v1.0.10

@@ -1152,19 +1152,25 @@ public partial class MainWindow : Window
         }
     }
 
+    private void OnOpenTelegram(object sender, RoutedEventArgs e)
+        => OpenExternalUrl("https://t.me/yeet17", "Telegram");
+
     private void OnOpenGitHub(object sender, RoutedEventArgs e)
+        => OpenExternalUrl("https://github.com/scarrymany/klip", "GitHub");
+
+    private void OpenExternalUrl(string url, string serviceName)
     {
         try
         {
             Process.Start(new ProcessStartInfo
             {
-                FileName = "https://github.com/scarrymany/klip",
+                FileName = url,
                 UseShellExecute = true,
             });
         }
         catch (Exception ex)
         {
-            Notify($"Не удалось открыть GitHub: {ex.Message}");
+            Notify($"Не удалось открыть {serviceName}: {ex.Message}");
         }
     }
 

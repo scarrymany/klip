@@ -7,21 +7,35 @@ public sealed class ReleaseContractTests
     private static readonly string Root = FindRepositoryRoot();
 
     [Fact]
-    public void GitHub_button_precedes_minimize_button_in_title_bar()
+    public void Social_buttons_precede_minimize_in_approved_order()
     {
         var xaml = Read("src", "Klip", "MainWindow.xaml");
+        var telegram = xaml.IndexOf("Click=\"OnOpenTelegram\"", StringComparison.Ordinal);
         var github = xaml.IndexOf("Click=\"OnOpenGitHub\"", StringComparison.Ordinal);
         var minimize = xaml.IndexOf("Click=\"OnMinimize\"", StringComparison.Ordinal);
 
+        Assert.True(telegram >= 0, "Telegram chrome button is missing.");
         Assert.True(github >= 0, "GitHub chrome button is missing.");
+        Assert.True(telegram < github, "Telegram chrome button must precede GitHub.");
         Assert.True(github < minimize, "GitHub chrome button must precede minimize.");
+        Assert.Contains("ToolTip=\"Telegram @yeet17\"", xaml, StringComparison.Ordinal);
         Assert.Contains("ToolTip=\"Репозиторий на GitHub\"", xaml, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Social_buttons_open_expected_urls()
+    {
+        var code = Read("src", "Klip", "MainWindow.xaml.cs");
+
+        Assert.Contains("\"https://t.me/yeet17\"", code, StringComparison.Ordinal);
+        Assert.Contains("\"https://github.com/scarrymany/klip\"", code, StringComparison.Ordinal);
+        Assert.Contains("UseShellExecute = true", code, StringComparison.Ordinal);
     }
 
     [Fact]
     public void Release_version_is_synchronized()
     {
-        const string version = "1.1.1";
+        const string version = "1.1.2";
         var project = XDocument.Parse(Read("src", "Klip", "Klip.csproj"));
         var properties = project.Root!.Elements("PropertyGroup").Elements().ToDictionary(x => x.Name.LocalName, x => x.Value);
 
@@ -43,7 +57,7 @@ public sealed class ReleaseContractTests
         var workflow = Read(".github", "workflows", "release.yml");
 
         Assert.Contains("Klip-Setup-${{ needs.build.outputs.version }}.exe", workflow, StringComparison.Ordinal);
-        Assert.DoesNotContain("Klip-Setup-1.1.1.exe", workflow, StringComparison.Ordinal);
+        Assert.DoesNotContain("Klip-Setup-1.1.2.exe", workflow, StringComparison.Ordinal);
     }
 
     [Fact]
