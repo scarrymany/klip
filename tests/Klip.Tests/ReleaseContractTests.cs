@@ -35,7 +35,7 @@ public sealed class ReleaseContractTests
     [Fact]
     public void Release_version_is_synchronized()
     {
-        const string version = "1.2.1";
+        const string version = "1.2.2";
         var project = XDocument.Parse(Read("src", "Klip", "Klip.csproj"));
         var properties = project.Root!.Elements("PropertyGroup").Elements().ToDictionary(x => x.Name.LocalName, x => x.Value);
 

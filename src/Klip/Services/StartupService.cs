@@ -39,6 +39,28 @@ public static class StartupService
         key.SetValue(ValueName, $"\"{path}\"");
     }
 
+    public static void RepairIfEnabled()
+    {
+        try
+        {
+            using var key = Registry.CurrentUser.OpenSubKey(RunKeyPath, writable: true);
+            if (key?.GetValue(ValueName) is not string configured || string.IsNullOrWhiteSpace(configured))
+                return;
+
+            var path = ResolveExecutablePath();
+            if (string.IsNullOrWhiteSpace(path))
+                return;
+
+            var expected = $"\"{path}\"";
+            if (!configured.Equals(expected, StringComparison.OrdinalIgnoreCase))
+                key.SetValue(ValueName, expected);
+        }
+        catch
+        {
+            // Startup repair must never block launching Klip.
+        }
+    }
+
     private static string? ResolveExecutablePath()
     {
         var path = Environment.ProcessPath;

@@ -22,11 +22,21 @@ jobs:
         id: ver
         shell: bash
         run: |
-          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
-            echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
-          else
-            echo "version=1.0.0" >> "$GITHUB_OUTPUT"
+          project_version="$(awk -F'[<>]' '/<Version>/{print $3; exit}' src/Klip/Klip.csproj)"
+          if [[ -z "${project_version}" ]]; then
+            echo "Version is missing in Klip.csproj" >&2
+            exit 1
           fi
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            version="${GITHUB_REF_NAME#v}"
+            if [[ "${version}" != "${project_version}" ]]; then
+              echo "Tag ${version} does not match project ${project_version}" >&2
+              exit 1
+            fi
+          else
+            version="${project_version}"
+          fi
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
 
       - uses: actions/setup-dotnet@v4
         with:
@@ -72,6 +82,7 @@ jobs:
           dotnet tool install --global wix --version 5.0.2
           $env:PATH = "$env:USERPROFILE\.dotnet\tools;$env:PATH"
           wix build installer\Klip.wxs `
+            -arch x64 `
             -d PublishDir="$PWD\dist\app" `
             -d ProductVersion="${{ steps.ver.outputs.version }}" `
             -o "dist\Klip-${{ steps.ver.outputs.version }}-win-x64.msi"

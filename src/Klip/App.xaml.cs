@@ -66,6 +66,7 @@ public partial class App : System.Windows.Application
         try
         {
             _store = new ClipStore();
+            StartupService.RepairIfEnabled();
             _watcher = new ClipboardWatcher();
             _hotkey = new HotkeyService();
             _tray = new TrayService();

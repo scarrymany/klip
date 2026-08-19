@@ -8,6 +8,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+using System.Windows.Media.Effects;
 using System.Windows.Shell;
 using System.Windows.Threading;
 using Klip.Models;
@@ -30,6 +31,17 @@ public partial class MainWindow : Window
     private readonly DispatcherTimer _updateTimer;
     private readonly DispatcherTimer _imageClickTimer;
     private readonly Dictionary<string, WpfButton> _nav = [];
+    private readonly BlurEffect _wallpaperBlurEffect = new()
+    {
+        KernelType = KernelType.Gaussian,
+        RenderingBias = RenderingBias.Performance,
+    };
+    private readonly BitmapCache _wallpaperBitmapCache = new()
+    {
+        RenderAtScale = 1,
+        EnableClearType = false,
+        SnapsToDevicePixels = true,
+    };
 
     private string _filter = "all";
     private bool _forceClose;
@@ -1215,6 +1227,7 @@ public partial class MainWindow : Window
     {
         if (_theme.WallpaperPath is not { } path || !System.IO.File.Exists(path))
         {
+            ApplyWallpaperBlur(0);
             WallpaperImage.Source = null;
             _wallpaperLoaded = null;
             WallpaperImage.Visibility = Visibility.Collapsed;
@@ -1229,12 +1242,26 @@ public partial class MainWindow : Window
         }
         WallpaperImage.Stretch = UiTheme.ParseStretch(_theme.Stretch);
         WallpaperImage.Visibility = Visibility.Visible;
-        WallpaperBlur.Radius = _theme.Blur;
+        ApplyWallpaperBlur(_theme.Blur);
         WallpaperDim.Background = new SolidColorBrush(Color.FromArgb(
             (byte)Math.Clamp((int)(_theme.Dim * 255), 0, 255),
             tint.R, tint.G, tint.B));
         WallpaperDim.Visibility = Visibility.Visible;
         return true;
+    }
+
+    private void ApplyWallpaperBlur(double radius)
+    {
+        if (radius <= 0)
+        {
+            WallpaperImage.Effect = null;
+            WallpaperImage.CacheMode = null;
+            return;
+        }
+
+        _wallpaperBlurEffect.Radius = radius;
+        WallpaperImage.CacheMode = _wallpaperBitmapCache;
+        WallpaperImage.Effect = _wallpaperBlurEffect;
     }
 
     private static void SetBrush(string key, Color color)

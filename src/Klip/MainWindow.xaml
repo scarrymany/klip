@@ -45,14 +45,7 @@
                 <Image x:Name="WallpaperImage"
                        Stretch="UniformToFill"
                        Visibility="Collapsed"
-                       IsHitTestVisible="False">
-                    <Image.CacheMode>
-                        <BitmapCache RenderAtScale="1" EnableClearType="False" SnapsToDevicePixels="True"/>
-                    </Image.CacheMode>
-                    <Image.Effect>
-                        <BlurEffect x:Name="WallpaperBlur" Radius="0" KernelType="Gaussian" RenderingBias="Performance"/>
-                    </Image.Effect>
-                </Image>
+                       IsHitTestVisible="False"/>
                 <Border x:Name="WallpaperDim"
                         Visibility="Collapsed"
                         IsHitTestVisible="False"/>

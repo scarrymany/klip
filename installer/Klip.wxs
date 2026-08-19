@@ -3,7 +3,7 @@
     <?define PublishDir = "$(sys.SOURCEFILEDIR)..\dist\app" ?>
   <?endif?>
   <?ifndef ProductVersion ?>
-    <?define ProductVersion = "1.2.1" ?>
+    <?define ProductVersion = "1.2.2" ?>
   <?endif?>
 
   <Package Name="Клип"
@@ -37,20 +37,20 @@
     </StandardDirectory>
 
     <ComponentGroup Id="AppFiles" Directory="INSTALLFOLDER">
-      <Component Id="KlipExe" Guid="C8A1D4E2-7B35-4F09-9A16-5E3C8D2B7041">
+      <Component Id="KlipExe" Guid="208C9278-A354-451A-80F3-621FB9933064">
         <File Id="KlipExeFile"
               Source="$(var.PublishDir)\Klip.exe"
               KeyPath="yes"
               Checksum="yes" />
       </Component>
-      <Component Id="KlipMarker" Guid="A9C3E5F1-8D24-4B70-91E6-3F5A7C2D9048">
+      <Component Id="KlipMarker" Guid="D85988A8-ABCE-4ABB-8377-747087BEFD5B">
         <File Id="KlipInstalledFile"
               Source="$(sys.SOURCEFILEDIR)Klip.installed"
               KeyPath="yes" />
       </Component>
     </ComponentGroup>
 
-    <Component Id="StartMenuShortcut" Directory="AppMenuFolder" Guid="D4B7E1A9-2C68-4E15-8F30-6A9D1C5B8342">
+    <Component Id="StartMenuShortcut" Directory="AppMenuFolder" Guid="4A45C119-680F-4923-B0D2-347FA65538C3">
       <Shortcut Id="StartMenuKlip"
                 Name="Клип"
                 Description="Менеджер буфера обмена"

@@ -3,6 +3,15 @@
 Формат основан на [Keep a Changelog](https://keepachangelog.com/ru/1.1.0/),
 нумерация версий следует [семантическому версионированию](https://semver.org/lang/ru/).
 
+## [1.2.2] - 2026-08-19
+
+### Исправлено
+
+- EXE-установщик удаляет старую MSI-копию и её ярлыки, чтобы Windows не запускала устаревший `Klip.exe` из `Program Files (x86)`.
+- MSI теперь явно собирается как x64 и устанавливается в `Program Files`.
+- Включённая автозагрузка автоматически обновляет путь до текущего исполняемого файла.
+- При нулевом размытии фонового фото GPU-эффект и bitmap-кеш отключаются, поэтому текстура фото больше не попадает на кнопки.
+
 ## [1.2.1] - 2026-08-19
 
 ### Исправлено
@@ -157,6 +166,7 @@
 - Окно без стандартного заголовка, тёмная layered-подложка и прозрачные скруглённые углы.
 - Сборка одним файлом win-x64, установщик Inno Setup, MSI на WiX и портативный zip.
 
+[1.2.2]: https://github.com/scarrymany/klip/releases/tag/v1.2.2
 [1.2.1]: https://github.com/scarrymany/klip/releases/tag/v1.2.1
 [1.2.0]: https://github.com/scarrymany/klip/releases/tag/v1.2.0
 [1.1.2]: https://github.com/scarrymany/klip/releases/tag/v1.1.2
