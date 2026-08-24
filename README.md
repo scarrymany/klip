@@ -13,7 +13,6 @@
 [![Platform](https://img.shields.io/badge/Windows%2010%20%7C%2011-0b0d11?style=for-the-badge&logo=windows&logoColor=d7dde6)](#установка)
 [![.NET](https://img.shields.io/badge/.NET%209-0b0d11?style=for-the-badge&logo=dotnet&logoColor=d7dde6)](#сборка)
 [![Telegram](https://img.shields.io/badge/@yeet17-0b0d11?style=for-the-badge&logo=telegram&logoColor=d7dde6)](https://t.me/yeet17)
-[![Donate](https://img.shields.io/badge/поддержать-0b0d11?style=for-the-badge&labelColor=0b0d11&color=c48a7a)](DONATE.md)
 
 [Установка](#установка) · [Возможности](#возможности) · [Горячие клавиши](#горячие-клавиши) · [Сборка](#сборка) · [English](README.en.md)
 
@@ -163,10 +162,6 @@ git push origin v1.2.3
 Установщик стирает программу. База в `%APPDATA%\Klip` удаляется вместе с деинсталляцией EXE.
 
 </details>
-
-## Поддержать проект
-
-Реквизиты — в [DONATE.md](DONATE.md).
 
 ## Лицензия
 
