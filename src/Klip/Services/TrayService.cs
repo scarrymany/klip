@@ -24,7 +24,7 @@ public sealed class TrayService : IDisposable
 
         _notifyIcon = new WinForms.NotifyIcon
         {
-            Text = "Клип",
+            Text = "Scarp Klip",
             Visible = true,
             Icon = _icon,
             ContextMenuStrip = menu,

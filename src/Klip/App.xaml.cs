@@ -48,7 +48,7 @@ public partial class App : System.Windows.Application
             args.Handled = true;
             System.Windows.MessageBox.Show(
                 args.Exception.Message,
-                "Клип",
+                "Scarp Klip",
                 MessageBoxButton.OK,
                 MessageBoxImage.Error);
         };
@@ -94,7 +94,7 @@ public partial class App : System.Windows.Application
         }
         catch (Exception ex)
         {
-            System.Windows.MessageBox.Show(ex.Message, "Клип", MessageBoxButton.OK, MessageBoxImage.Error);
+            System.Windows.MessageBox.Show(ex.Message, "Scarp Klip", MessageBoxButton.OK, MessageBoxImage.Error);
             Shutdown();
         }
     }

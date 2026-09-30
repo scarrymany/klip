@@ -56,9 +56,8 @@ public partial class MainWindow : Window
     private string _editorColor = ClipColors.None;
     private string? _wallpaperLoaded;
     private bool _appearanceReady;
-    private bool _overlayClosing;
     private bool _navReady;
-    private DispatcherTimer? _overlayHide;
+    private readonly Dictionary<Grid, DispatcherTimer> _overlayHides = [];
     private readonly DispatcherTimer _themeSaveTimer;
     private readonly DispatcherTimer _themeApplyTimer;
 
@@ -316,8 +315,8 @@ public partial class MainWindow : Window
         _pendingUpdate = info;
         UpdateTitle.Text = $"Доступна версия {info.Version}";
         UpdateHint.Text = UpdateService.IsPortableInstall()
-            ? "Клип скачает файл, заменит себя и откроется снова."
-            : "Клип обновится и откроется снова. Может появиться запрос прав Windows.";
+            ? "Scarp Klip скачает файл, заменит себя и откроется снова."
+            : "Scarp Klip обновится и откроется снова. Может появиться запрос прав Windows.";
         UpdateButton.Content = "Обновить";
         UpdateButton.IsEnabled = true;
 
@@ -395,6 +394,18 @@ public partial class MainWindow : Window
 
     private void ApplyFilter(long? selectId)
     {
+        PageTitle.Text = _filter switch
+        {
+            "pinned" => "Закреплённое",
+            "clip" => "Фрагменты",
+            "note" => "Заметки",
+            "code" => "Код",
+            "link" => "Ссылки",
+            "image" => "Изображения",
+            _ when _filter.StartsWith("collection:", StringComparison.Ordinal) =>
+                (FolderList.ItemsSource as IEnumerable<CollectionItem>)?.FirstOrDefault(c => $"collection:{c.Id}" == _filter)?.Name ?? "Папка",
+            _ => "Все записи",
+        };
         IEnumerable<ClipItem> query = _all;
         if (_filter == "pinned")
             query = query.Where(c => c.Pinned);
@@ -964,31 +975,44 @@ public partial class MainWindow : Window
 
     private void PlayOverlay(Grid overlay, FrameworkElement card, bool show)
     {
+        if (_overlayHides.Remove(overlay, out var pendingHide))
+            pendingHide.Stop();
+
         if (show)
         {
-            _overlayClosing = false;
-            _overlayHide?.Stop();
+            foreach (var other in new[] { EditorOverlay, SettingsOverlay, ImagePreviewOverlay })
+            {
+                if (ReferenceEquals(other, overlay))
+                    continue;
+                if (_overlayHides.Remove(other, out var otherHide))
+                    otherHide.Stop();
+                other.BeginAnimation(OpacityProperty, null);
+                other.Visibility = Visibility.Collapsed;
+                if (ReferenceEquals(other, SettingsOverlay))
+                    SettingsButton.Tag = null;
+                if (ReferenceEquals(other, ImagePreviewOverlay))
+                {
+                    ImagePreview.Source = null;
+                    _previewImage = null;
+                }
+            }
             overlay.Visibility = Visibility.Visible;
         }
-        else if (_overlayClosing || overlay.Visibility != Visibility.Visible)
+        else if (overlay.Visibility != Visibility.Visible)
         {
             return;
-        }
-        else
-        {
-            _overlayClosing = true;
         }
 
         card.RenderTransformOrigin = new Point(0.5, 0.42);
         var scale = new ScaleTransform(show ? 0.96 : 1, show ? 0.96 : 1);
-        var slide = new TranslateTransform(0, show ? 14 : 0);
+        var slide = new TranslateTransform(0, show ? 6 : 0);
         var group = new TransformGroup();
         group.Children.Add(scale);
         group.Children.Add(slide);
         card.RenderTransform = group;
 
         var ease = new CubicEase { EasingMode = show ? EasingMode.EaseOut : EasingMode.EaseIn };
-        var duration = TimeSpan.FromMilliseconds(show ? 240 : 150);
+        var duration = TimeSpan.FromMilliseconds(150);
 
         overlay.BeginAnimation(OpacityProperty, new DoubleAnimation(show ? 0 : 1, show ? 1 : 0, duration)
         {
@@ -997,22 +1021,22 @@ public partial class MainWindow : Window
         });
         scale.BeginAnimation(ScaleTransform.ScaleXProperty, new DoubleAnimation(show ? 0.96 : 1, show ? 1 : 0.98, duration) { EasingFunction = ease });
         scale.BeginAnimation(ScaleTransform.ScaleYProperty, new DoubleAnimation(show ? 0.96 : 1, show ? 1 : 0.98, duration) { EasingFunction = ease });
-        slide.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(show ? 14 : 0, show ? 0 : 10, duration) { EasingFunction = ease });
+        slide.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(show ? 6 : 0, show ? 0 : 6, duration) { EasingFunction = ease });
 
         if (show)
             return;
 
-        _overlayHide?.Stop();
-        _overlayHide = new DispatcherTimer { Interval = duration };
-        _overlayHide.Tick += (_, _) =>
+        var hide = new DispatcherTimer { Interval = duration };
+        _overlayHides[overlay] = hide;
+        hide.Tick += (_, _) =>
         {
-            _overlayHide.Stop();
+            hide.Stop();
+            _overlayHides.Remove(overlay);
             overlay.BeginAnimation(OpacityProperty, null);
             overlay.Opacity = 1;
             overlay.Visibility = Visibility.Collapsed;
-            _overlayClosing = false;
         };
-        _overlayHide.Start();
+        hide.Start();
     }
 
     private static void PlayFade(UIElement element, bool show, Action? done = null)
@@ -1045,7 +1069,7 @@ public partial class MainWindow : Window
         _theme.Blur = SettingsBlur.Value;
         _theme.Dim = SettingsDim.Value / 100.0;
         SettingsBlurValue.Text = ((int)_theme.Blur).ToString(CultureInfo.InvariantCulture);
-        SettingsDimValue.Text = ((int)(_theme.Dim * 100)).ToString(CultureInfo.InvariantCulture) + "%";
+        SettingsDimValue.Text = ((int)Math.Round(_theme.Dim * 100)).ToString(CultureInfo.InvariantCulture) + "%";
         ScheduleThemeApply();
         PersistTheme(immediateSave: false);
     }
@@ -1148,6 +1172,28 @@ public partial class MainWindow : Window
         Notify("Оформление сброшено");
     }
 
+    private void OnFontLicense(object sender, RoutedEventArgs e)
+    {
+        if (FontLicenseToggle.IsChecked == true)
+        {
+            if (FontLicenseText.Text.Length == 0)
+            {
+                var resource = System.Windows.Application.GetResourceStream(
+                    new Uri("pack://application:,,,/Klip;component/Assets/Fonts/LICENSE.txt"));
+                if (resource is not null)
+                {
+                    using var reader = new StreamReader(resource.Stream);
+                    FontLicenseText.Text = reader.ReadToEnd();
+                }
+            }
+            FontLicenseText.Visibility = Visibility.Visible;
+        }
+        else
+        {
+            FontLicenseText.Visibility = Visibility.Collapsed;
+        }
+    }
+
     private void PersistTheme(bool immediateSave = true)
     {
         if (_appearanceReady)
@@ -1188,7 +1234,7 @@ public partial class MainWindow : Window
         SettingsBlur.Value = _theme.Blur;
         SettingsDim.Value = _theme.Dim * 100;
         SettingsBlurValue.Text = ((int)_theme.Blur).ToString(CultureInfo.InvariantCulture);
-        SettingsDimValue.Text = ((int)(_theme.Dim * 100)).ToString(CultureInfo.InvariantCulture) + "%";
+        SettingsDimValue.Text = ((int)Math.Round(_theme.Dim * 100)).ToString(CultureInfo.InvariantCulture) + "%";
         SettingsPhotoName.Text = _theme.WallpaperFile is { } name ? name : "Фото не выбрано";
         SyncStretchChips();
         _syncingUi = false;
@@ -1267,7 +1313,12 @@ public partial class MainWindow : Window
     private static void SetBrush(string key, Color color)
     {
         if (System.Windows.Application.Current.TryFindResource(key) is SolidColorBrush brush && !brush.IsFrozen)
+        {
             brush.Color = color;
+            return;
+        }
+
+        System.Windows.Application.Current.Resources[key] = new SolidColorBrush(color);
     }
 
     private void OnSourceInitialized(object? sender, EventArgs e)
@@ -1378,7 +1429,7 @@ public partial class MainWindow : Window
             return;
 
         var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
-        var slide = new TranslateTransform(22 * direction, 12);
+        var slide = new TranslateTransform(10 * direction, 0);
         var scale = new ScaleTransform(0.982, 0.982);
         var group = new TransformGroup();
         group.Children.Add(scale);
@@ -1387,12 +1438,12 @@ public partial class MainWindow : Window
         ClipPane.RenderTransform = group;
         ClipPane.Opacity = 0;
 
-        var time = TimeSpan.FromMilliseconds(320);
-        slide.BeginAnimation(TranslateTransform.XProperty, new DoubleAnimation(22 * direction, 0, time) { EasingFunction = ease });
-        slide.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(12, 0, time) { EasingFunction = ease });
+        var time = TimeSpan.FromMilliseconds(150);
+        slide.BeginAnimation(TranslateTransform.XProperty, new DoubleAnimation(10 * direction, 0, time) { EasingFunction = ease });
+        slide.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(0, 0, time) { EasingFunction = ease });
         scale.BeginAnimation(ScaleTransform.ScaleXProperty, new DoubleAnimation(0.982, 1, time) { EasingFunction = ease });
         scale.BeginAnimation(ScaleTransform.ScaleYProperty, new DoubleAnimation(0.982, 1, time) { EasingFunction = ease });
-        ClipPane.BeginAnimation(UIElement.OpacityProperty, new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(260)) { EasingFunction = ease });
+        ClipPane.BeginAnimation(UIElement.OpacityProperty, new DoubleAnimation(0, 1, time) { EasingFunction = ease });
     }
 
     private static T? FindVisualChild<T>(DependencyObject? root) where T : DependencyObject

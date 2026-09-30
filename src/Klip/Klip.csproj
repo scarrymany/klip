@@ -11,12 +11,12 @@
     <ApplicationIcon>Assets\klip.ico</ApplicationIcon>
     <RootNamespace>Klip</RootNamespace>
     <AssemblyName>Klip</AssemblyName>
-    <Version>1.2.3</Version>
-    <AssemblyVersion>1.2.3.0</AssemblyVersion>
-    <FileVersion>1.2.3.0</FileVersion>
-    <InformationalVersion>1.2.3</InformationalVersion>
-    <Product>Клип</Product>
-    <AssemblyTitle>Клип</AssemblyTitle>
+    <Version>1.3.0</Version>
+    <AssemblyVersion>1.3.0.0</AssemblyVersion>
+    <FileVersion>1.3.0.0</FileVersion>
+    <InformationalVersion>1.3.0</InformationalVersion>
+    <Product>Scarp Klip</Product>
+    <AssemblyTitle>Scarp Klip</AssemblyTitle>
     <Company>scarrymany</Company>
     <Authors>scarrymany</Authors>
     <Copyright>© 2026 scarrymany</Copyright>
@@ -39,6 +39,10 @@
 
   <ItemGroup>
     <Resource Include="Assets\klip.ico" />
+    <Resource Include="Assets\Fonts\*.ttf" />
+    <Resource Include="Assets\Fonts\LICENSE.txt" />
+    <None Update="Assets\Fonts\LICENSE.txt" TargetPath="Inter-OFL.txt"
+          CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

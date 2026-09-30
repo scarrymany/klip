@@ -7,10 +7,10 @@ namespace Klip.Services;
 
 public sealed class UiTheme
 {
-    public const string DefaultAccent = "#D7DDE6";
-    public const string DefaultTint = "#0B0D11";
+    public const string DefaultAccent = "#FFFFFF";
+    public const string DefaultTint = "#0A0A0A";
 
-    public bool Acrylic { get; set; } = true;
+    public bool Acrylic { get; set; }
     public string Accent { get; set; } = DefaultAccent;
     public string Tint { get; set; } = DefaultTint;
     public string? WallpaperFile { get; set; }
@@ -29,7 +29,7 @@ public sealed class UiTheme
     {
         var theme = new UiTheme
         {
-            Acrylic = store.GetSetting("ui.acrylic") != "0",
+            Acrylic = store.GetSetting("ui.acrylic") == "1",
             Accent = store.GetSetting("ui.accent") ?? DefaultAccent,
             Tint = store.GetSetting("ui.tint") ?? DefaultTint,
             WallpaperFile = EmptyToNull(store.GetSetting("ui.wallpaper")),
@@ -60,7 +60,7 @@ public sealed class UiTheme
 
     public void Reset()
     {
-        Acrylic = true;
+        Acrylic = false;
         Accent = DefaultAccent;
         Tint = DefaultTint;
         WallpaperFile = null;
@@ -101,8 +101,8 @@ public sealed class UiTheme
     {
         var lum = (0.2126 * accent.R + 0.7152 * accent.G + 0.0722 * accent.B) / 255.0;
         return lum > 0.58
-            ? Color.FromRgb(0x0B, 0x0D, 0x11)
-            : Color.FromRgb(0xEE, 0xF1, 0xF5);
+            ? Colors.Black
+            : Colors.White;
     }
 
     public static Color? TryParseHex(string? hex)

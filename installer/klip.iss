@@ -1,11 +1,11 @@
-#define MyAppName "Клип"
+#define MyAppName "Scarp Klip"
 #define MyAppNameEn "Klip"
 #define MyAppPublisher "scarrymany"
 #define MyAppURL "https://github.com/scarrymany/klip"
 #define MyAppExeName "Klip.exe"
 
 #ifndef MyAppVersion
-  #define MyAppVersion "1.2.3"
+  #define MyAppVersion "1.3.0"
 #endif
 
 #ifndef PublishDir

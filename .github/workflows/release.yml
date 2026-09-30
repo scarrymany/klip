@@ -46,6 +46,7 @@ jobs:
         run: |
           dotnet restore Klip.sln
           dotnet build Klip.sln -c Release --no-restore -p:Version=${{ steps.ver.outputs.version }}
+          dotnet test Klip.sln -c Release --no-build --verbosity minimal
           dotnet publish src/Klip/Klip.csproj -c Release -r win-x64 --self-contained true `
             -p:PublishSingleFile=true `
             -p:IncludeNativeLibrariesForSelfExtract=true `
@@ -61,7 +62,7 @@ jobs:
 
       - name: Portable ZIP
         shell: pwsh
-        run: Compress-Archive -Path dist/app/Klip.exe -DestinationPath dist/Klip-Portable-win-x64.zip -Force
+        run: Compress-Archive -Path dist/app/Klip.exe,dist/app/Inter-OFL.txt -DestinationPath dist/Klip-Portable-win-x64.zip -Force
 
       - name: Inno Setup EXE
         shell: pwsh
@@ -132,7 +133,7 @@ jobs:
           draft: false
           prerelease: false
           body: |
-            ## Клип ${{ needs.build.outputs.version }}
+            ## Scarp Klip ${{ needs.build.outputs.version }}
 
             Личный буфер обмена и заметки для Windows 10/11.
 

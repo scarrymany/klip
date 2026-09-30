@@ -197,7 +197,7 @@ public sealed class ClipStore : IDisposable
 
         var now = DateTime.UtcNow;
         var content =
-            "Клип следит за буфером обмена и сохраняет текст локально.\n\n" +
+            "Scarp Klip следит за буфером обмена и сохраняет текст локально.\n\n" +
             "Ctrl+Shift+V показывает и скрывает окно.\n" +
             "Нажмите на запись, чтобы скопировать её обратно.\n" +
             "Закреплённые фрагменты не вытесняются из истории.";
@@ -207,7 +207,7 @@ public sealed class ClipStore : IDisposable
             INSERT INTO clips (title, content, kind, color, pinned, copy_count, created_at, updated_at, source, content_hash)
             VALUES ($title, $content, $kind, 'none', 1, 0, $now, $now, $source, $hash);
             """;
-        insert.Parameters.AddWithValue("$title", "Добро пожаловать в Клип");
+        insert.Parameters.AddWithValue("$title", "Добро пожаловать в Scarp Klip");
         insert.Parameters.AddWithValue("$content", content);
         insert.Parameters.AddWithValue("$kind", ClipKinds.Note);
         insert.Parameters.AddWithValue("$now", Format(now));

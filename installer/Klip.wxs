@@ -3,10 +3,10 @@
     <?define PublishDir = "$(sys.SOURCEFILEDIR)..\dist\app" ?>
   <?endif?>
   <?ifndef ProductVersion ?>
-    <?define ProductVersion = "1.2.3" ?>
+    <?define ProductVersion = "1.3.0" ?>
   <?endif?>
 
-  <Package Name="Клип"
+  <Package Name="Scarp Klip"
            Language="1049"
            Version="$(var.ProductVersion)"
            Manufacturer="scarrymany"
@@ -48,11 +48,16 @@
               Source="$(sys.SOURCEFILEDIR)Klip.installed"
               KeyPath="yes" />
       </Component>
+      <Component Id="InterFontLicense" Guid="3F8D9905-773D-48B5-92F0-B830975640A1">
+        <File Id="InterFontLicenseFile"
+              Source="$(var.PublishDir)\Inter-OFL.txt"
+              KeyPath="yes" />
+      </Component>
     </ComponentGroup>
 
     <Component Id="StartMenuShortcut" Directory="AppMenuFolder" Guid="4A45C119-680F-4923-B0D2-347FA65538C3">
       <Shortcut Id="StartMenuKlip"
-                Name="Клип"
+                Name="Scarp Klip"
                 Description="Менеджер буфера обмена"
                 Target="[INSTALLFOLDER]Klip.exe"
                 WorkingDirectory="INSTALLFOLDER"
@@ -66,7 +71,7 @@
                      KeyPath="yes" />
     </Component>
 
-    <Feature Id="ProductFeature" Title="Клип" Level="1" AllowAbsent="no">
+    <Feature Id="ProductFeature" Title="Scarp Klip" Level="1" AllowAbsent="no">
       <ComponentGroupRef Id="AppFiles" />
       <ComponentRef Id="StartMenuShortcut" />
     </Feature>

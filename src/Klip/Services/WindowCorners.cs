@@ -6,7 +6,7 @@ namespace Klip.Services;
 
 public static class WindowCorners
 {
-    public const double Radius = 16;
+    public const double Radius = 6;
 
     public static CornerRadius FrameRadius => new(Radius);
 
